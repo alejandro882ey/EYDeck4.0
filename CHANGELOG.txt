@@ -1,0 +1,15 @@
+# Dashboard Django Change Log
+
+## 2025-08-25
+
+### Fixed
+- Fixed database migration issue by applying pending migrations, resolving "no such table: core_dashboard_revenueentry" error
+- Fixed UnboundLocalError for hours_fytd_goal and hours_mtd_goal by initializing them with default values before the try block in dashboard_view
+- Fixed UnboundLocalError for partner_fytd_charged_hours and partner_mtd_charged_hours by initializing them with default values at the beginning of the partner specification section
+
+### Added
+- Created CHANGELOG.txt to document all code changes
+
+### Notes
+- The partner filtering issue was caused by uninitialized variables in the partner specification section
+- All variables that could potentially be referenced outside their initialization scope have been properly initialized with default values
