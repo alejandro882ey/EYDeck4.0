@@ -1,0 +1,34 @@
+**Project Context Summary**
+
+**Core Purpose:**
+This is a Django-based web application designed for data visualization and analysis. It allows users to upload data, view it in dashboards and tables, and interact with various analytics components.
+
+**Guiding Principle for AI Development:**
+"Improve and Adjust, Never change the integrity of the code."
+
+This means that any modifications should enhance the existing functionality, fix bugs, or refactor for clarity and efficiency. Do not fundamentally alter the core architecture, purpose, or logic of the application without explicit direction. Adhere to the existing coding style, patterns, and conventions found within the project.
+
+**Code Integrity and Rollback:**
+The project is under Git version control. If a change introduces errors or deviates from the requirements, you should revert to the last stable state. Use `git log` to review recent commits and `git checkout <commit_hash> -- <file_path>` or other git commands to restore files to a known good version.
+
+**Project Components Breakdown:**
+
+1.  **Django Backend (`core_dashboard/` & `dashboard_django/`)**
+    *   `dashboard_django/`: This is the main Django project configuration directory.
+        *   `settings.py`: Contains all project settings, including database configuration, installed apps, and middleware.
+        *   `urls.py`: The main URL routing file. It directs incoming requests to the appropriate app.
+    *   `core_dashboard/`: This is the primary application for the dashboard.
+        *   `models.py`: Defines the database schema through Django ORM models.
+        *   `views.py`: Contains the business logic for handling requests and rendering the frontend pages.
+        *   `urls.py`: Maps URLs to the views within the `core_dashboard` app.
+        *   `templates/`: Holds the HTML templates that form the user interface.
+        *   `management/commands/`: Contains custom management commands for tasks like data import (`import_revenue_data.py`).
+
+2.  **Data Processing Scripts (Root Directory)**
+    *   Files like `create_metas_database.py`, `process_detailed_metas.py`, and `ey_analytics_engine.py` are standalone scripts used for data ingestion, processing, and analysis. They likely prepare data that is then used or displayed by the Django application.
+
+3.  **Frontend Example (`Ejemplo para dashboard/`)**
+    *   This directory contains a separate, modern frontend application built with React (`package.json`, `src/App.js`). It appears to be a design template or a proof-of-concept for a future UI. It is not currently integrated with the Django backend.
+
+**Note:**
+This document is the single source of truth for project context and should only be updated by explicit user command.
