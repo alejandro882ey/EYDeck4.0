@@ -26,6 +26,7 @@ import subprocess
 from .data_processor import process_uploaded_files
 from .models import UploadHistory, RevenueEntry, Client, Area, SubArea, Contract, ExchangeRate
 from .utils import get_fiscal_month_year
+from core_dashboard.modules import ranking_module
 
 
 def upload_file_view(request):
@@ -462,6 +463,12 @@ def dashboard_view(request):
     client_labels = [item['client__name'] for item in top_clients_chart]
     client_data = [float(item['total_revenue'] or 0) for item in top_clients_chart]
 
+    # Rankings (managers, clients, engagements)
+    top_managers, all_managers_ranked = ranking_module.compute_ranking(revenue_entries_for_kpis, 'engagement_manager', revenue_field='revenue')
+    top_clients_rank, all_clients_ranked = ranking_module.compute_ranking(revenue_entries_for_kpis, 'client__name', revenue_field='revenue')
+    # use contract__name (existing field) for engagement/contract labels
+    top_engagements, all_engagements_ranked = ranking_module.compute_ranking(revenue_entries_for_kpis, 'contract__name', revenue_field='revenue')
+
     # Revenue Trend by Date (calculating daily revenue in Python)
     import pandas as pd
 
@@ -724,14 +731,15 @@ def dashboard_view(request):
         partner_perdida_diferencial = partner_revenue_entries.aggregate(
             total_perdida=Sum('fytd_diferencial_final')
         )['total_perdida'] or 0
-        partner_spec_data['total_perdida_diferencial'] = "${:,.2f}".format(partner_perdida_diferencial)
+        # Keep numeric value in context so templates can format consistently
+        partner_spec_data['total_perdida_diferencial'] = partner_perdida_diferencial
 
         # 2. Perdida Diferencial per Client for the partner
         perdida_per_client = partner_revenue_entries.values('client__name').annotate(
             perdida=Sum('fytd_diferencial_final')
         ).order_by('-perdida')
         partner_spec_data['perdida_per_client'] = [
-            {'client_name': item['client__name'], 'perdida': "${:,.2f}".format(item['perdida'] or 0)}
+            {'client_name': item['client__name'], 'perdida': item['perdida'] or 0}
             for item in perdida_per_client
         ]
 
@@ -740,7 +748,7 @@ def dashboard_view(request):
             perdida=Sum('fytd_diferencial_final')
         ).order_by('-perdida')[:5]
         partner_spec_data['top_engagements_perdida'] = [
-            {'engagement_name': item['contract__name'], 'perdida': "${:,.2f}".format(item['perdida'] or 0)}
+            {'engagement_name': item['contract__name'], 'perdida': item['perdida'] or 0}
             for item in top_engagements_perdida
         ]
 
@@ -770,6 +778,12 @@ def dashboard_view(request):
         'total_billing': total_billing,
         'active_employees_venezuela': active_employees_venezuela,
         'top_partners': top_partners,
+    'top_managers': top_managers,
+    'all_managers_ranked': all_managers_ranked,
+    'top_clients_rank': top_clients_rank,
+    'all_clients_ranked': all_clients_ranked,
+    'top_engagements': top_engagements,
+    'all_engagements_ranked': all_engagements_ranked,
         'loss_per_differential': loss_per_differential,
         'area_labels': json.dumps(area_labels),
         'area_data': json.dumps(area_data),
@@ -808,10 +822,15 @@ def dashboard_view(request):
         'total_anticipos': total_anticipos,
 
         # Macro Section Data
-        'macro_total_clients': "{:,.0f}".format(macro_total_clients),
-        'macro_total_ansr_sintetico': macro_total_ansr_sintetico,
-        'macro_margin': "${:,.2f}".format(macro_margin),
-        'macro_margin_percentage': "{:.2f}%".format(macro_margin_percentage),
+    'macro_total_clients': "{:,.0f}".format(macro_total_clients),
+    'macro_total_ansr_sintetico': macro_total_ansr_sintetico,
+    # Keep existing formatted strings for backward compatibility
+    'macro_margin': "${:,.2f}".format(macro_margin),
+    'macro_margin_percentage': "{:.2f}%".format(macro_margin_percentage),
+    # Provide numeric values for templates that need numeric formatting
+    'macro_margin_value': macro_margin,
+    'macro_margin_percentage_value': macro_margin_percentage,
+    'macro_rph_value': macro_rph,
         'macro_rph': "${:,.2f}".format(macro_rph),
         'macro_monthly_tracker': macro_monthly_tracker,
         'total_fytd_charged_hours': "{:,.0f}".format(total_fytd_charged_hours),
@@ -930,6 +949,20 @@ def dashboard_view(request):
             print(f"DEBUG:   partner_spec_data['{key}']: {value}")
     else:
         print(f"DEBUG: partner_spec_data is NOT present or is empty in context.")
+
+    # Compute latest available report date from historico_de_final_database so the dashboard can link to previews
+    try:
+        DATA_DIR = os.path.join(settings.MEDIA_ROOT, 'historico_de_final_database')
+        latest_report_date = None
+        if os.path.exists(DATA_DIR):
+            weekly_dirs = [d for d in os.listdir(DATA_DIR) if os.path.isdir(os.path.join(DATA_DIR, d))]
+            if weekly_dirs:
+                latest_report_date = sorted(weekly_dirs, reverse=True)[0]
+        context['latest_report_date'] = latest_report_date
+        print(f"DEBUG: latest_report_date set to: {latest_report_date}")
+    except Exception as e:
+        print(f"Error computing latest_report_date: {e}")
+        context['latest_report_date'] = None
 
     return render(request, 'core_dashboard/dashboard.html', context)
 

@@ -1,19 +1,29 @@
 {% extends "core_dashboard/base.html" %}
 
 {% block content %}
-{% load progress_bar %}
+{% load progress_bar humanize %}
 <style>
+    /* Prevent horizontal overflow and improve dashboard fit */
+    html, body {
+        overflow-x: hidden;
+        min-width: 0;
+    }
+    .card { word-wrap: break-word; }
     .flip-card {
         background-color: transparent;
         width: 100%;
-        height: 300px; /* Adjusted height for top 5 list */
+        aspect-ratio: 1 / 1; /* force square cards */
+        max-height: 420px; /* avoid excessively tall squares on very wide screens */
         perspective: 1000px;
+        display: block;
     }
 
+    .flip-card { cursor: pointer; }
+
     .flip-card-inner {
-        position: relative;
-        width: 100%;
-        height: 100%;
+    position: relative;
+    width: 100%;
+    height: 100%;
         text-align: center;
         transition: transform 0.6s;
         transform-style: preserve-3d;
@@ -29,8 +39,8 @@
         height: 100%;
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
-        display: flex;
-        flex-direction: column;
+    display: flex;
+    flex-direction: column;
         background-color: var(--ey-dark-grey);
         color: white;
         border-radius: .25rem; /* Match card style */
@@ -38,13 +48,81 @@
 
     .flip-card-back {
         transform: rotateY(180deg);
-        padding: 15px;
+        padding: 0.5rem;
+        overflow: hidden; /* contain scroll inside inner body */
+    }
+
+    /* Ensure inner body scrolls if content overflows the square */
+    .flip-card-front .card-body, .flip-card-back .table-responsive {
         overflow-y: auto;
+        padding: .5rem;
     }
 
     #filterBody {
         min-height: 150px; /* Ensure filter body has a minimum height */
     }
+
+    /* Macro card sizing: slightly smaller cards, tighter padding, and slightly reduced KPI font
+       This keeps the dashboard fit while improving proportions for numeric values. */
+    .macro-row .card {
+        padding: 0.6rem; /* reduce inner padding */
+        min-height: 170px; /* larger to accommodate bigger KPI font */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .macro-row .card .card-body { padding-top: .4rem; padding-bottom: .4rem; }
+
+    .macro-row .kpi-card-value {
+        font-size: 3rem; /* increased for prominent visibility */
+        line-height: 1.02;
+        font-weight: 700;
+    }
+
+    .macro-row .card-header {
+        font-size: 0.9rem;
+        padding: .35rem .6rem;
+    }
+
+    /* Add a bit more horizontal gap between macro columns on larger screens */
+    @media (min-width: 768px) {
+        .macro-row > .col-md-4 { padding-left: .6rem; padding-right: .6rem; }
+    }
+
+    /* Use Bootstrap columns for layout; enforce square flip-cards inside columns for consistent look */
+    .flip-card { aspect-ratio: 1 / 1; width: 100%; max-height: 420px; }
+    /* On very small screens, allow flip-cards to be slightly taller to fit content */
+    @media (max-width: 575.98px) {
+        .flip-card { aspect-ratio: auto; height: 320px; }
+    }
+
+    /* Default smaller screens: stack as single column unless overridden by media queries */
+    .ranking-col {
+        box-sizing: border-box;
+        padding-left: .25rem;
+        padding-right: .25rem;
+        width: 100%;
+        max-width: 100%;
+        display: block;
+    }
+
+    /* Medium screens: two columns */
+    @media (min-width: 768px) {
+        /* Make 4 columns at tablet+ sizes so tiles sit horizontally on most desktops */
+        .ranking-row { grid-template-columns: repeat(4, 1fr) !important; }
+    }
+
+    /* Large and up: four equal columns, non-wrapping */
+    @media (min-width: 992px) {
+        /* Strict 4-column grid on large screens */
+        .ranking-row { grid-template-columns: repeat(4, 1fr) !important; }
+        .ranking-col { width: auto; max-width: none; }
+    }
+
+    /* Visual polish for flip-cards: card-like look, rounded corners and hidden overflow so inner scroll works */
+    .ranking-col .flip-card { width: 100%; display: block; overflow: hidden; border-radius: .25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+    .flip-card-front .card-header, .flip-card-back .card-title { padding: .6rem .75rem; }
 </style>
 
 <h3 class="section-title">Data Filtering</h3>
@@ -164,7 +242,7 @@
         <div class="card text-center">
             <div class="card-header">FYTD ANSR</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_fytd_ansr_value|floatformat:0 }}</h3>
+                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_fytd_ansr_value|floatformat:0|intcomma }}</h3>
                 <div class="progress mt-2">
                     {% with completion=partner_spec_data.partner_fytd_ansr_completion_percentage %}
                     <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
@@ -178,7 +256,7 @@
         <div class="card text-center">
             <div class="card-header">MTD ANSR</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_mtd_ansr_value|floatformat:0 }}</h3>
+                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_mtd_ansr_value|floatformat:0|intcomma }}</h3>
                 <div class="progress mt-2">
                     {% with completion=partner_spec_data.partner_mtd_ansr_completion_percentage %}
                     <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
@@ -302,7 +380,7 @@
         <div class="card text-center">
             <div class="card-header">Total Perdida Diferencial</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ partner_spec_data.total_perdida_diferencial }}</h3>
+                <h3 class="card-title kpi-card-value">${{ partner_spec_data.total_perdida_diferencial|floatformat:0|intcomma }}</h3>
             </div>
         </div>
     </div>
@@ -314,7 +392,7 @@
                     {% for item in partner_spec_data.perdida_per_client %}
                     <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
                         {{ item.client_name }}
-                        <span class="badge bg-danger rounded-pill">{{ item.perdida }}</span>
+                        <span class="badge bg-danger rounded-pill">${{ item.perdida|floatformat:0|intcomma }}</span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -329,7 +407,7 @@
                     {% for item in partner_spec_data.top_engagements_perdida %}
                     <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
                         {{ item.engagement_name }}
-                        <span class="badge bg-danger rounded-pill">{{ item.perdida }}</span>
+                        <span class="badge bg-danger rounded-pill">${{ item.perdida|floatformat:0|intcomma }}</span>
                     </li>
                     {% endfor %}
                 </ul>
@@ -341,70 +419,27 @@
 
 {% if not selected_partner %}
 <h3 class="section-title">Macro</h3>
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Total Clients</div>
+
+<!-- First row: YTD values (ANSR, Horas, Margin) -->
+<div class="row mb-3 macro-row">
+    <div class="col-md-4 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">ANSR YTD</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ macro_total_clients }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center" onclick="window.location.href='{% url 'data_downloads' %}?report_date={{ selected_week }}'">
-            <div class="card-header">ANSR FYTD</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ ansr_fytd_value|floatformat:0 }}</h3>
+                <h3 class="card-title kpi-card-value">${{ ansr_fytd_value|floatformat:0|intcomma }}</h3>
                 <div class="progress mt-2">
                     {% with completion=ansr_fytd_completion_percentage %}
                     <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">(${{ ansr_fytd_goal|floatformat:0 }})</small>
+                <small class="text-white d-block">(${{ ansr_fytd_goal|floatformat:0|intcomma }})</small>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Margin</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ macro_margin }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Margin Percentage</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ macro_margin_percentage }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">RPH</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ macro_rph }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center" onclick="window.location.href='{% url 'data_downloads' %}?report_date={{ selected_week }}'">
-            <div class="card-header">ANSR MTD</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ ansr_mtd_value|floatformat:0 }}</h3>
-                <div class="progress mt-2">
-                    {% with completion=ansr_mtd_completion_percentage %}
-                    <div class="progress-bar {{ completion|progress_bar_class }}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
-                    {% endwith %}
-                </div>
-                <small class="text-white">(${{ ansr_mtd_goal|floatformat:0 }})</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Horas Cargadas (FYTD)</div>
+    <div class="col-md-4 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">Horas Cargadas (YTD)</div>
             <div class="card-body">
                 <h3 class="card-title kpi-card-value">{{ total_fytd_charged_hours }}</h3>
                 <div class="progress mt-2">
@@ -412,12 +447,42 @@
                     <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">({{ hours_fytd_goal|floatformat:0 }})</small>
+                <small class="text-white d-block">({{ hours_fytd_goal|floatformat:0 }})</small>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
+    <div class="col-md-4 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">Margin</div>
+            <div class="card-body">
+                <h3 class="card-title kpi-card-value">{{ macro_margin_percentage_value|floatformat:0 }}%</h3>
+                <small class="text-white d-block mt-2">${{ macro_margin_value|default:0|floatformat:0|intcomma }}</small>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second row: MTD values (ANSR MTD under ANSR YTD, Horas MTD under Horas YTD, Perdida under Margin) -->
+<div class="row mb-3 macro-row">
+    <div class="col-md-4 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">ANSR MTD</div>
+            <div class="card-body">
+                <h3 class="card-title kpi-card-value">${{ ansr_mtd_value|floatformat:0|intcomma }}</h3>
+                <div class="progress mt-2">
+                    {% with completion=ansr_mtd_completion_percentage %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% endwith %}
+                </div>
+                <small class="text-white d-block">(${{ ansr_mtd_goal|floatformat:0|intcomma }})</small>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
             <div class="card-header">Horas Cargadas (MTD)</div>
             <div class="card-body">
                 <h3 class="card-title kpi-card-value">{{ total_mtd_charged_hours }}</h3>
@@ -426,24 +491,42 @@
                     <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">({{ hours_mtd_goal|floatformat:0 }})</small>
+                <small class="text-white d-block">({{ hours_mtd_goal|floatformat:0 }})</small>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center" onclick="window.location.href='{% url 'data_downloads' %}?report_date={{ selected_week }}'">
+    <div class="col-md-4 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
             <div class="card-header">Perdida Diferencial</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ macro_diferencial_final|floatformat:0 }}</h3>
+                <h3 class="card-title kpi-card-value">${{ macro_diferencial_final|floatformat:0|intcomma }}</h3>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
             </div>
         </div>
     </div>
 </div>
 
+<!-- RPH centered full-width bar below -->
+<div class="row mb-4 macro-row">
+    <div class="col-12">
+        <div class="card text-center">
+            <div class="card-header">RPH</div>
+            <div class="card-body">
+                <h3 class="card-title kpi-card-value">${{ macro_rph_value|floatformat:1 }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <h3 class="section-title">Key Performance Indicators</h3>
-<div class="row">
-    <div class="col-md-6">
-        <div class="flip-card" onclick="window.location.href='{% url 'data_downloads' %}?report_date={{ selected_week }}'">
+
+<!-- Two-column layout: left column = Partners (top) / Engagements (bottom); right column = Managers (top) / Clients (bottom) -->
+<div class="row mb-3">
+    <div class="col-md-6 col-sm-12 mb-2">
+        <!-- Top Partners (wider) -->
+        <div class="flip-card h-100" id="topPartnersFlipCard" role="button" tabindex="0" aria-pressed="false">
             <div class="flip-card-inner">
                 <div class="flip-card-front">
                     <div class="card-header w-100">Top 5 Partners by Revenue</div>
@@ -482,18 +565,120 @@
                                         {% endfor %}
                                     </td>
                                 </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Engagements under Partners (same size) -->
+        <div class="flip-card h-100 mt-2" id="topEngagementsFlipCard" role="button" tabindex="0" aria-pressed="false">
+            <div class="flip-card-inner">
+                <div class="flip-card-front">
+                    <div class="card-header w-100">Top 5 Engagements by Revenue</div>
+                    <div class="card-body w-100" style="overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            {% for e in top_engagements %}
+                            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                                {{ e.label }}
+                                <span class="badge bg-primary rounded-pill">${{ e.total_revenue|floatformat:2 }}</span>
+                            </li>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flip-card-back">
+                    <h5 class="card-title">All Engagements by Revenue</h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped table-hover">
+                            <thead>
+                                <tr><th>Engagement</th><th>Revenue</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for e in all_engagements_ranked %}
+                                <tr><td>{{ e.label }}</td><td>${{ e.total_revenue|floatformat:2 }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
+    <div class="col-md-6 col-sm-12 mb-2">
+        <!-- Top Managers (wider) -->
+        <div class="flip-card h-100" id="topManagersFlipCard" role="button" tabindex="0" aria-pressed="false">
+            <div class="flip-card-inner">
+                <div class="flip-card-front">
+                    <div class="card-header w-100">Top 5 Managers by Revenue</div>
+                    <div class="card-body w-100" style="overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            {% for m in top_managers %}
+                            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                                {{ m.label }}
+                                <span class="badge bg-primary rounded-pill">${{ m.total_revenue|floatformat:2 }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="flip-card-back">
+                    <h5 class="card-title">All Managers by Revenue</h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped table-hover">
+                            <thead>
+                                <tr><th>Manager</th><th>Revenue</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for m in all_managers_ranked %}
+                                <tr><td>{{ m.label }}</td><td>${{ m.total_revenue|floatformat:2 }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clients under Managers (same size) -->
+        <div class="flip-card h-100 mt-2" id="topClientsFlipCard" role="button" tabindex="0" aria-pressed="false">
+            <div class="flip-card-inner">
+                <div class="flip-card-front">
+                    <div class="card-header w-100">Top 5 Clients by Revenue</div>
+                    <div class="card-body w-100" style="overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            {% for c in top_clients_rank %}
+                            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                                {{ c.label }}
+                                <span class="badge bg-primary rounded-pill">${{ c.total_revenue|floatformat:2 }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="flip-card-back">
+                    <h5 class="card-title">All Clients by Revenue</h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped table-hover">
+                            <thead>
+                                <tr><th>Client</th><th>Revenue</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for c in all_clients_ranked %}
+                                <tr><td>{{ c.label }}</td><td>${{ c.total_revenue|floatformat:2 }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-    
-</div>
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
@@ -507,85 +692,7 @@
     </div>
 </div>
 
-<h3 class="section-title">Revenue Visualizations</h3>
-<!-- Charts Section -->
-<div class="row mb-4">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">Revenue by Service Line</div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="areaChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">Top 5 Clients by Revenue</div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="clientChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header">Revenue Trend</div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="trendChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">Client Distribution by Partner</div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="partnerDistributionChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">Unbilled Inventory by Service Line</div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="unbilledInventoryChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Nuevo Gráfico: Pérdida por Tipo de Cambio -->
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header">Pérdida por Tipo de Cambio</div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="chart-container">
-                            <canvas id="lossPerDifferentialChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <h4>Valores de Pérdida:</h4>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item bg-transparent text-white">Total Pérdida: {{ loss_per_differential }}</li>
-                            <li class="list-group-item bg-transparent text-white">Pérdida BCV: <span id="loss-bcv">N/A</span></li>
-                            <li class="list-group-item bg-transparent text-white">Pérdida Monitor: <span id="loss-monitor">N/A</span></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
+<!-- Revenue Visualizations removed per request -->
 
 {% endblock %}
 
@@ -600,14 +707,31 @@
                 filterForm.submit();
             });
         });
+
+        // Flip behavior: attach to all .flip-card elements (click or Enter/Space)
+        document.querySelectorAll('.flip-card').forEach(card => {
+            const toggleFlip = (e) => {
+                if (e.target.closest && e.target.closest('a, button')) return;
+                card.classList.toggle('flipped');
+                card.setAttribute('aria-pressed', card.classList.contains('flipped'));
+            };
+
+            card.addEventListener('click', toggleFlip);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleFlip(e);
+                }
+            });
+        });
     });
 
     // Exchange Rate Chart (Plotly)
     if (document.getElementById('exchangeRateChart')) {
-        const exchangeDates = {{ exchange_dates|safe }};
-        const oficialRatesHistory = {{ oficial_rates_history|safe }};
-        const paraleloRatesHistory = {{ paralelo_rates_history|safe }};
-        const differentialHistory = {{ differential_history|safe }};
+    const exchangeDates = JSON.parse('{{ exchange_dates|default:'[]'|escapejs }}');
+    const oficialRatesHistory = JSON.parse('{{ oficial_rates_history|default:'[]'|escapejs }}');
+    const paraleloRatesHistory = JSON.parse('{{ paralelo_rates_history|default:'[]'|escapejs }}');
+    const differentialHistory = JSON.parse('{{ differential_history|default:'[]'|escapejs }}');
 
         const traceOficial = {
             x: exchangeDates,
@@ -658,250 +782,20 @@
         Plotly.newPlot('exchangeRateChart', [traceOficial, traceParalelo, traceDifferential], layout);
     }
 
-    // Data from Django context
-    const areaLabels = {{ area_labels|safe }};
-    const areaData = {{ area_data|safe }};
-    const clientLabels = {{ client_labels|safe }};
-    const clientData = {{ client_data|safe }};
-    const trendLabels = {{ trend_labels|safe }};
-    const trendData = {{ trend_data|safe }};
+    // Revenue charts removed per request
 
-    // Nuevos datos para gráficos
-    const partnerDistributionLabels = JSON.parse('{{ partner_distribution_labels|safe }}');
-    const partnerDistributionData = JSON.parse('{{ partner_distribution_data|safe }}');
-    const unbilledLabels = JSON.parse('{{ unbilled_labels|safe }}');
-    const unbilledData = JSON.parse('{{ unbilled_data|safe }}');
-
-    // Chart.js Global Defaults for EY Theme
-    Chart.defaults.color = 'var(--ey-dark-grey)'; // Text color
-    Chart.defaults.borderColor = 'var(--ey-light-grey)'; // Axis and grid line color
-    Chart.defaults.font.family = 'Arial, sans-serif';
-
-    // Define a color palette for charts
-    
-
-    if (document.getElementById('areaChart')) {
-        // Area Chart
-        new Chart(document.getElementById('areaChart'), {
-            type: 'bar',
-            data: {
-                labels: areaLabels,
-                datasets: [{
-                    label: 'Revenue',
-                    data: areaData,
-                    backgroundColor: 'var(--ey-yellow)',
-                    borderColor: 'var(--ey-yellow)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    },
-                    x: {
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: 'var(--ey-dark-grey)'
-                        }
-                    }
-                }
-            }
+    // Add JS to make macro cards clickable (but not the preview button)
+    document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.macro-card').forEach(card => {
+        const reportDate = card.getAttribute('data-report-date');
+        if (!reportDate) return; // nothing to link to
+        const previewUrl = `{% url 'data_downloads' %}?report_date=` + encodeURIComponent(reportDate);
+        // Click on the card body (not the preview button) navigates to preview
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.preview-btn') || e.target.closest('a, button')) return; // ignore clicks on the preview button or links
+            window.location.href = previewUrl;
         });
-    }
-
-    if (document.getElementById('clientChart')) {
-        // Client Chart
-        new Chart(document.getElementById('clientChart'), {
-            type: 'bar',
-            data: {
-                labels: clientLabels,
-                datasets: [{
-                    label: 'Revenue',
-                    data: clientData,
-                    backgroundColor: 'var(--ey-blue)',
-                    borderColor: 'var(--ey-blue)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    },
-                    x: {
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: 'var(--ey-dark-grey)'
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    if (document.getElementById('trendChart')) {
-        // Trend Chart
-        new Chart(document.getElementById('trendChart'), {
-            type: 'line',
-            data: {
-                labels: trendLabels,
-                datasets: [{
-                    label: 'Revenue',
-                    data: trendData,
-                    borderColor: 'var(--ey-green)',
-                    backgroundColor: 'rgba(102, 153, 0, 0.2)',
-                    borderWidth: 2,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    },
-                    x: {
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: 'var(--ey-dark-grey)'
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    if (document.getElementById('partnerDistributionChart')) {
-        // Client Distribution by Partner (Pie Chart)
-        const pieChartColors = [
-            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-        ];
-        new Chart(document.getElementById('partnerDistributionChart'), {
-            type: 'pie',
-            data: {
-                labels: partnerDistributionLabels,
-                datasets: [{
-                    label: 'Number of Clients',
-                    data: partnerDistributionData,
-                    backgroundColor: pieChartColors,
-                    borderColor: 'var(--ey-white)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: 'var(--ey-dark-grey)'
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    if (document.getElementById('unbilledInventoryChart')) {
-        // Unbilled Inventory by Service Line (Bar Chart)
-        new Chart(document.getElementById('unbilledInventoryChart'), {
-            type: 'bar',
-            data: {
-                labels: unbilledLabels,
-                datasets: [{
-                    label: 'Unbilled Amount',
-                    data: unbilledData,
-                    backgroundColor: 'var(--ey-red)',
-                    borderColor: 'var(--ey-red)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    },
-                    x: {
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: 'var(--ey-dark-grey)'
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    if (document.getElementById('lossPerDifferentialChart')) {
-        // Pérdida por Tipo de Cambio
-        const lossPerDifferentialChartLabels = ['Pérdida Oficial', 'Pérdida Paralelo']; // Etiquetas para las dos barras
-        const lossPerDifferentialChartData = [
-            {% if loss_oficial_data %}{{ loss_oficial_data|floatformat:1 }}{% else %}0{% endif %},
-            {% if loss_paralelo_data %}{{ loss_paralelo_data|floatformat:1 }}{% else %}0{% endif %}
-        ];
-
-        new Chart(document.getElementById('lossPerDifferentialChart'), {
-            type: 'bar',
-            data: {
-                labels: lossPerDifferentialChartLabels,
-                datasets: [{
-                    label: 'Monto de Pérdida',
-                    data: lossPerDifferentialChartData,
-                    backgroundColor: ['var(--ey-purple)', 'var(--ey-yellow)'], // Using purple and yellow
-                    borderColor: ['var(--ey-purple)', 'var(--ey-yellow)'],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    },
-                    x: {
-                        ticks: { color: 'var(--ey-dark-grey)' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: 'var(--ey-dark-grey)'
-                        }
-                    }
-                }
-            }
-        });
-    }
+    });
+});
 </script>
 {% endblock %}
