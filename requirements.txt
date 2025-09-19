@@ -11,3 +11,4 @@ pyDolarVenezuela>=1.0
 fredapi>=0.4
 scikit-learn>=0.24
 pandasgui>=0.2
+openpyxl>=3.0

@@ -1,7 +1,7 @@
 from django.db.models import Sum
 
 
-def compute_ranking(queryset, group_by_field, revenue_field='fytd_ansr_amt'):
+def compute_ranking(queryset, group_by_field, revenue_field='fytd_ansr_sintetico'):
     """Return full ranking and top 5 for a queryset grouped by group_by_field.
 
     Args:

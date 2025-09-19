@@ -1,7 +1,14 @@
 **Project Context Summary**
 
 **Core Purpose:**
-This is a Django-based web application designed for data visualization and analysis. It allows users to upload data, view it in dashboards and tables, and interact with various analytics components.
+This is a sophisticated Django-based web application designed for EY Venezuela's revenue tracking, analytics, and data visualization. It serves as a comprehensive dashboard for financial data analysis, exchange rate monitoring, and business intelligence reporting. The application handles multiple data sources, complex financial calculations, and provides advanced analytics capabilities.
+
+**🚨 CRITICAL SERVER CONFIGURATION:**
+**PORT REQUIREMENT: The Django development server MUST run on port 8001**
+- Default Django command: `python manage.py runserver 8001`
+- Browser URL: `http://127.0.0.1:8001`
+- This port is hardcoded in `launch_dashboard.py` and MUST NOT be changed
+- All development and production deployments MUST use port 8001 for consistency
 
 **Guiding Principle for AI Development:**
 "Improve and Adjust, Never change the integrity of the code."
@@ -11,24 +18,337 @@ This means that any modifications should enhance the existing functionality, fix
 **Code Integrity and Rollback:**
 The project is under Git version control. If a change introduces errors or deviates from the requirements, you should revert to the last stable state. Use `git log` to review recent commits and `git checkout <commit_hash> -- <file_path>` or other git commands to restore files to a known good version.
 
-**Project Components Breakdown:**
+## **Module Development Guidelines & Programming Principles**
 
-1.  **Django Backend (`core_dashboard/` & `dashboard_django/`)**
-    *   `dashboard_django/`: This is the main Django project configuration directory.
-        *   `settings.py`: Contains all project settings, including database configuration, installed apps, and middleware.
-        *   `urls.py`: The main URL routing file. It directs incoming requests to the appropriate app.
-    *   `core_dashboard/`: This is the primary application for the dashboard.
-        *   `models.py`: Defines the database schema through Django ORM models.
-        *   `views.py`: Contains the business logic for handling requests and rendering the frontend pages.
-        *   `urls.py`: Maps URLs to the views within the `core_dashboard` app.
-        *   `templates/`: Holds the HTML templates that form the user interface.
-        *   `management/commands/`: Contains custom management commands for tasks like data import (`import_revenue_data.py`).
+### **🏗️ MODULE DEVELOPMENT STRUCTURE**
+**MANDATORY: All new modules MUST be developed within organized folder structures inside the web application.**
 
-2.  **Data Processing Scripts (Root Directory)**
-    *   Files like `create_metas_database.py`, `process_detailed_metas.py`, and `ey_analytics_engine.py` are standalone scripts used for data ingestion, processing, and analysis. They likely prepare data that is then used or displayed by the Django application.
+**Folder Organization Pattern:**
+```
+core_dashboard/
+├── modules/
+│   ├── [module_name]/
+│   │   ├── __init__.py
+│   │   ├── models.py          # Module-specific models
+│   │   ├── views.py           # Module-specific views  
+│   │   ├── urls.py            # Module URL patterns
+│   │   ├── services.py        # Business logic layer
+│   │   ├── utils.py           # Helper functions
+│   │   ├── serializers.py     # Data serialization (if needed)
+│   │   ├── forms.py           # Django forms (if needed)
+│   │   ├── admin.py           # Admin interface (if needed)
+│   │   ├── tests.py           # Module-specific tests
+│   │   └── templates/         # Module-specific templates
+│   │       └── [module_name]/
+│   │           └── *.html
+│   └── shared/                # Shared utilities across modules
+│       ├── __init__.py
+│       ├── decorators.py
+│       ├── mixins.py
+│       └── constants.py
+```
 
-3.  **Frontend Example (`Ejemplo para dashboard/`)**
-    *   This directory contains a separate, modern frontend application built with React (`package.json`, `src/App.js`). It appears to be a design template or a proof-of-concept for a future UI. It is not currently integrated with the Django backend.
+### **📋 PROGRAMMING PRINCIPLES & ORDER**
+
+#### **1. SOLID Principles Implementation**
+- **Single Responsibility**: Each class/function has one clear purpose
+- **Open/Closed**: Open for extension, closed for modification
+- **Liskov Substitution**: Derived classes must be substitutable for base classes
+- **Interface Segregation**: Many specific interfaces rather than one general
+- **Dependency Inversion**: Depend on abstractions, not concretions
+
+#### **2. Code Organization & Structure**
+- **Separation of Concerns**: Models, Views, Services, and Utils clearly separated
+- **DRY Principle**: Don't Repeat Yourself - extract common functionality
+- **KISS Principle**: Keep It Simple, Stupid - avoid unnecessary complexity
+- **YAGNI**: You Aren't Gonna Need It - don't build features until needed
+
+#### **3. Django-Specific Best Practices**
+- **Fat Models, Thin Views**: Business logic in models/services, not views
+- **URL Namespacing**: Use app namespaces for URL patterns
+- **Template Inheritance**: Use base templates and template blocks
+- **Static Files Organization**: Proper CSS/JS/Images folder structure
+- **Database Optimization**: Use select_related() and prefetch_related()
+
+#### **4. Module Integration Standards**
+- **Import Order**: Standard library → Third-party → Local imports
+- **Naming Conventions**: snake_case for functions/variables, PascalCase for classes
+- **Documentation**: Docstrings for all public methods and classes
+- **Error Handling**: Proper exception handling with logging
+- **Type Hints**: Use Python type hints for better code clarity
+
+#### **5. Testing & Quality Assurance**
+- **Test-Driven Development**: Write tests before implementation
+- **Unit Tests**: Test individual components in isolation
+- **Integration Tests**: Test component interactions
+- **Code Coverage**: Maintain high test coverage percentages
+- **Linting**: Use tools like flake8, black, isort for code quality
+
+## **Web Application Architecture & Critical Sections**
+
+### **Django Project Structure (`dashboard_django/` - Project Root)**
+- **`settings.py`**: Central configuration hub - CRITICAL for database, authentication, and app registration
+- **`urls.py`**: Main URL routing - handles all incoming requests and directs to appropriate apps
+- **`wsgi.py/asgi.py`**: WSGI/ASGI configuration for deployment
+
+⚠️ **CRITICAL WARNING**: Changes to settings.py can break the entire application. Always backup before modifying installed apps, database settings, or middleware configurations.
+
+### **Core Application (`core_dashboard/` - Main Business Logic)**
+
+#### **Data Layer (Models & Database)**
+- **`models.py`**: Complex revenue tracking schema with 20+ fields including:
+  - Financial metrics (revenue, billing, collections)
+  - Exchange rate differentials 
+  - Fiscal period calculations
+  - Engagement tracking with partnerships
+  - Collection and billing YTD functionality
+
+⚠️ **CRITICAL SECTIONS**:
+- **RevenueEntry model**: Central data entity - modifications require careful migration planning
+- **ExchangeRate model**: Auto-calculates differentials - custom save() method must be preserved
+- **Foreign key relationships**: Client→Contract→Area→SubArea hierarchy must remain intact
+
+#### **Business Logic Layer (Views)**
+- **`views.py`** (1,183 lines): Massive view file containing all application logic
+  - `dashboard_view()`: Main analytics dashboard with complex data aggregations
+  - `upload_file_view()`: Multi-file upload processor (engagement, differential, revenue data)
+  - `tables_view()`: Data table display with filtering capabilities
+  - `analysis_view()`: Advanced analytics and reporting
+  - `messaging_view()`: Communication features
+  - `data_downloads_view()`: Data export functionality
+
+⚠️ **INTEGRITY WARNINGS**:
+- Views contain complex financial calculations - test thoroughly after any changes
+- Upload processing involves external script coordination - maintain file validation logic
+- Database queries use complex aggregations - optimize carefully to avoid performance degradation
+
+#### **Modular Components (`modules/`)**
+Specialized modules for specific business functions:
+- **`exchange_rate_module.py`**: Processes Historial_TCBinance.xlsx for rate differential analysis
+- **`collection_module.py`**: Handles collection/billing calculations
+- **`mtd_module.py`**: Month-to-date financial calculations
+- **`ranking_module.py`**: Business ranking and performance analytics
+- **`hooks.py`**: System hooks and integrations
+
+⚠️ **MODULE INTERDEPENDENCIES**: These modules are tightly coupled with the main views and models. Changes in one module may cascade to others.
+
+#### **Data Processing Pipeline**
+- **`data_processor.py`**: Currently a placeholder - actual processing handled by external scripts
+- **`utils.py`**: Helper functions for fiscal calculations and data transformations
+
+#### **Management Commands (`management/commands/`)**
+- **`import_revenue_data.py`**: Automated data import from external sources
+- **`collect_exchange_rates.py`**: Exchange rate data collection automation
+- **`validate_diferencial_mtd.py`**: Data validation and integrity checks
+
+### **Secondary Applications**
+- **`dashboard_app/`**: Currently minimal - appears to be a placeholder for future expansion
+
+### **Templates & Frontend (`templates/core_dashboard/`)**
+- **`base.html`**: Master template - modifications affect all pages
+- **`dashboard.html`**: Main analytics interface
+- **`upload.html`**: Multi-file upload interface
+- **`tables.html`**: Data table views
+- **`analysis.html`**: Advanced analytics interface
+
+## **External Analytics Engine (`ey_analytics_engine.py`)**
+Standalone 660-line analytics engine providing:
+- Real-time exchange rate fetching (pyDolarVenezuela integration)
+- Commodity price monitoring (Oil, IBC Index)
+- Advanced statistical modeling (ARIMA, VAR, HP filtering)
+- Web scraping for financial indices
+- Plotly visualization generation
+
+⚠️ **CRITICAL DEPENDENCY**: This engine is imported and used throughout the Django views. Any changes must maintain API compatibility.
+
+## **Data Processing Scripts (Root Level)**
+External processing scripts that work in coordination with the web application:
+- **Revenue Processing**: `process_manager_metas.py`, `process_pped_metas.py`
+- **Data Analysis**: `analyze_difference.py`, `engagement_analysis.py`
+- **Data Fixes**: `fix_diferencial_*.py`, `fix_problematic_entries.py`
+- **Validation**: `verify_*.py`, `validate_*.py`
+
+## **Technology Stack & Dependencies**
+- **Backend**: Django 5.2.5 with SQLite database
+- **Analytics**: pandas, numpy, scikit-learn, statsmodels
+- **Visualization**: Plotly for interactive charts
+- **External APIs**: pyDolarVenezuela, Alpha Vantage, BVC scraping
+- **File Processing**: openpyxl for Excel file handling
+
+## **Application Flow Categories**
+
+### **1. Data Ingestion & Processing**
+- Multi-file upload system (engagement, differential, revenue data)
+- Exchange rate data processing from Excel files
+- External API data collection
+- Data validation and integrity checks
+
+Important recent change (2025-09-16): Final_Database CSV removed from processing pipeline
+- The legacy combined `Final_Database_<date>.csv` is no longer written by the processing pipeline.
+  - Uploaded files (Engagement List, Revenue Days, and optional modules like Cobranzas/Facturacion)
+    are processed by `process_uploaded_data.py` and imported directly into the Django database
+    (models such as `RevenueEntry`). This avoids generating the intermediate Final_Database CSV file.
+  - The dashboard upload flow was updated so, after successful processing, the web UI redirects
+    to the main dashboard instead of showing a Final_Database preview. If processing fails, the
+    subprocess will return a non-zero exit code and the upload page will display the error output.
+
+New canonical column mappings
+- Engagement List is now the canonical source for most dashboard columns that used to come from
+  Final_Database. In particular:
+  - FYTD ANSR synthetic values (used for ANSR YTD/MTD and Revenue cards) are read from the
+    Engagement List column `FYTD_ANSRAmt (Sintético)` when present. If that synthetic column is
+    missing the system falls back to `FYTD_ANSRAmt` (provisional behavior for historic uploads).
+  - Perdida/diferencial values used across dashboard cards now come from the Engagement List column
+    `Perdida Dif. Camb.` (exact header expected). If `Perdida Dif. Camb.` is missing for an upload
+    (notably the 2025-07-11 Engagement file), the system will set the diferencial to 0 for those rows
+    as a provisional, auditable fallback.
+
+Notes & operational guidance
+- Keep uploading files to `MEDIA_ROOT/historico_de_final_database/<YYYY-MM-DD>/` for traceability —
+  the raw uploaded files are still stored there, but the combined CSV is not generated by the pipeline.
+- If you need the old Final_Database CSV for debugging, a developer script can be added to materialize
+  the merged dataset from the database rows for a given date.
+
+### **2. Financial Analytics & Calculations**
+- Revenue tracking and reporting
+- Exchange rate differential analysis
+- Month-to-date (MTD) and Year-to-date (YTD) calculations
+- Collection and billing analytics
+- Fiscal period management
+
+### **3. Visualization & Reporting**
+- Interactive dashboard with multiple chart types
+- Data table views with filtering
+- Advanced analytics reports
+- Export capabilities
+
+### **4. System Administration**
+- User authentication and management
+- Data cache management
+- File upload history tracking
+- System messaging and notifications
+
+## **Key Integration Points & Potential Failure Points**
+
+⚠️ **DATABASE MIGRATIONS**: Model changes require careful migration planning due to complex relationships
+⚠️ **FILE PROCESSING**: Upload system relies on external script coordination - maintain file validation
+⚠️ **EXCHANGE RATE DATA**: Critical dependency on Historial_TCBinance.xlsx file structure
+⚠️ **EXTERNAL APIS**: Fallback mechanisms required for pyDolarVenezuela and commodity price APIs
+⚠️ **FISCAL CALCULATIONS**: Complex fiscal period logic - test thoroughly with edge cases
 
 **Note:**
 This document is the single source of truth for project context and should only be updated by explicit user command.
+
+## Module classifications and component responsibilities
+
+- core_dashboard/: Main business logic app.
+  - modules/: Feature modules (each module follows the folder pattern described above).
+    - [module_name]/models.py: Domain models for the module (DB schema & business data).
+    - [module_name]/views.py: HTTP views / request handlers (thin - orchestration only).
+    - [module_name]/services.py: Business logic layer (fat models / reusable services).
+    - [module_name]/utils.py: Small helpers and pure functions used by the module.
+    - [module_name]/serializers.py: Data shape definitions for APIs or internal transforms.
+    - [module_name]/forms.py: Django forms for user input validation & cleaning.
+    - [module_name]/admin.py: Django admin registrations and admin customizations.
+    - [module_name]/tests.py: Unit + integration tests for the module's logic and endpoints.
+    - templates/[module_name]/: Module-specific templates used by views.
+  - shared/: Cross-module utilities (decorators, mixins, constants) used across features.
+  - models.py: Global or cross-cutting models (use sparingly; prefer module models).
+  - views.py: Legacy or high-level views that may orchestrate multiple modules (should be refactored into modules/services where possible).
+  - utils.py / data_processor.py: Application-wide helpers and pipeline orchestration.
+
+- Key specialized modules
+  - exchange_rate_module.py: Processes exchange rate history (Historial_TCBinance.xlsx), computes differentials and normalized series for MTD/YTD calculations.
+  - collection_module.py: Collection and billing calculations (aging, YTD collections, outstanding balances).
+  - mtd_module.py: Month-to-date and fiscal-period logic (MTD rollups, fiscal calendars).
+  - ranking_module.py: Business ranking and performance analytics (leaderboards, KPIs).
+  - hooks.py: Integration hooks and side-effect handlers (external systems, scheduled triggers).
+
+- ey_analytics_engine.py: Standalone analytics engine.
+  - Responsibilities: time-series analysis, external API wrappers (pyDolarVenezuela, commodity scrapers), forecasting (ARIMA/VAR), signal processing, plotly visualizations. Exported functions are used by views and modules; maintain API compatibility.
+
+- Management commands (management/commands/):
+  - import_revenue_data.py, collect_exchange_rates.py, validate_diferencial_mtd.py: Automated ingestion, validation and scheduled tasks. These are the canonical way to perform repeatable backend processing and should use module services rather than duplicating logic.
+
+- Templates & frontend (templates/core_dashboard/):
+  - base.html: Site-wide layout and blocks. Changing this impacts all pages.
+  - dashboard.html, upload.html, tables.html, analysis.html: Feature-specific templates; keep logic minimal and use template tags/filters for presentation logic.
+
+- Data processing scripts (root-level .py scripts):
+  - Scripts such as process_manager_metas.py, analyze_difference.py, fix_* scripts: Helpers for data correction and offline processing. Prefer migrating long-lived scripts into `core_dashboard/modules/` as management commands or services.
+
+## Package requirements and why they are included
+
+- Django>=3.0: Web framework used for the project (routing, ORM, templates, management commands).
+- pandas>=1.0: Primary data manipulation library — used heavily for data pipelines, Excel processing, aggregations, and MTD/YTD calculations.
+- numpy>=1.18: Numerical operations and array support used by pandas and statistical modules.
+- requests>=2.24: HTTP client for external APIs and web scraping helpers.
+- beautifulsoup4>=4.9: HTML parsing for web scraping commodity indices and BVC data.
+- pytrends>=4.7: Google Trends wrapper used by analytics engine for interest/time-series signals.
+- plotly>=4.14: Interactive charting for dashboard visualizations.
+- statsmodels>=0.12: Time-series models (ARIMA, VAR) and statistical tests used by analytics engine.
+- arch>=5.0: Advanced econometrics (heteroskedasticity models) used in forecasting and volatility modeling.
+- pyDolarVenezuela>=1.0: Venezuela-specific exchange rate wrapper used to fetch local FX series and official/parallel rates.
+- fredapi>=0.4: Federal Reserve Economic Data client — used for macro economic indicators and contextual data.
+- scikit-learn>=0.24: Machine learning utilities used in classification, clustering, or ranking tasks.
+- pandasgui>=0.2: Development/inspection helper to view DataFrames during debugging (non-critical; optional for dev).
+- openpyxl>=3.0: Excel read/write support for processing `Historial_TCBinance.xlsx` and other workbooks.
+
+## Cobranzas performance & caching (recent)
+
+The Cobranzas module (core_dashboard/modules/cobranzas/) now includes a simple persistent cache to accelerate preview and charting loads for the Macro card "Cobranzas (Collected YTD)".
+
+- Persistent cache:
+  - File: `MEDIA_ROOT/cobranzas/cobranzas_combined_cache.pkl`
+  - Contents: pickle of tuple `(max_mtime, pandas.DataFrame)` where `max_mtime` is the maximum modification time of the processed files at write time.
+
+- Invalidation rules:
+  - On upload (`process_uploaded_file`) the service deletes the persistent cache and clears the in-memory cache so the next request rebuilds with fresh files.
+  - On clear (`clear_processed_files`) the persistent cache is removed.
+  - When loading, the service compares current per-file mtimes to `max_mtime`; if any file is newer the cache is invalidated and rebuilt.
+
+- Safety and behavior:
+  - The cache is written atomically (tmp file -> os.replace) to avoid partial writes.
+  - If the persistent cache is missing or stale the first preview request will rebuild the combined DataFrame (this is I/O-bound and can be slow); subsequent requests are fast since the cache is used.
+
+See `core_dashboard/modules/cobranzas/COBRANZAS_DEVELOPMENT_LOG.txt` for more details and profiling results.
+
+Bugfix (2025-09-15): cache-invalidation-after-return and API return-type
+-------------------------------------------------------------------
+- Symptom: After uploading a processed Cobranzas file the dashboard card sometimes displayed 0.0 until the file was re-uploaded.
+- Cause: The cache-clearing code in `CobranzasService.process_uploaded_file()` was placed after a `return` and therefore never executed; the in-memory and persistent cache remained stale.
+- Fix: The service now clears the in-memory cache and removes the persistent cache file (best-effort) before returning the upload result. Also `get_collected_total_from_latest()` now returns a single float (collected total) to match caller expectations.
+- Verification: Upload -> check media folder -> refresh preview/dashboard. The Macro card now reflects the uploaded file without needing an extra upload. See development log for full verification steps.
+
+Notes:
+- Short-term / development-only helpers like `pandasgui` are optional; if CI or production environments should be kept minimal, pin environment-specific extras in a separate requirements-dev.txt.
+- When adding or upgrading packages, prefer semver-aware pins and run the test-suite and a quick smoke test of `runserver 8001` (as required by project) before committing.
+
+## Recent improvements (2025-09-16): cache-versioning and module parity
+
+The following non-breaking improvements were added to keep the dashboard loading fast while ensuring code changes force a full rebuild of cached data:
+
+- Shared cache-version helper
+  - `core_dashboard/modules/shared/cache_utils.py` — new helper that computes a short SHA256 digest of a module's top-level `.py` files. This digest ("code hash") is used to detect code changes that should invalidate caches.
+
+- Cobranzas cache metadata upgrade
+  - `core_dashboard/modules/cobranzas/services.py` now includes the module code-hash in the persistent cache metadata. The persistent cache pickle now stores either the legacy tuple `(max_mtime, df)` or the enhanced tuple `(max_mtime, code_hash, df)`.
+  - On load, the service validates both `max_mtime` and `code_hash` (when available). If the code-hash differs (module code changed) the cache is treated as stale and rebuilt. Atomic write (tmp -> os.replace) behavior is preserved.
+  - Backwards-compatible: if an older cache exists the service will still attempt to use it when only `max_mtime` is available.
+
+- Facturacion parity
+  - `core_dashboard/modules/facturacion/services.py` now computes a module code-hash and exposes `get_all_processed_df()` which attempts to load a persistent cache with code-hash validation, and writes the enhanced cache on build. This aligns Facturacion caching behavior with Cobranzas.
+
+- Small verification tool
+  - `tools/compute_module_hashes.py` was added to print module files and the computed hashes for quick local verification.
+
+- Runtime behavior (what changed for users)
+  - Speed when code unchanged: unchanged — warm requests continue to use the persistent and in-memory caches for fast loads.
+  - When code is edited/deployed: code-hash will differ and the next request will rebuild caches from processed files (cold rebuild). This ensures new code changes are effective immediately without requiring manual cache clears or re-uploads.
+
+- How to force a rebuild manually
+  - Delete the persistent cache files (e.g., `MEDIA_ROOT/cobranzas/cobranzas_combined_cache.pkl` or `MEDIA_ROOT/facturacion/facturacion_combined_cache.pkl`) or touch/edit any of the module's top-level `.py` files to change the code-hash.
+
+- Notes & next steps
+  - The change is intentionally minimal and low-risk and preserves prior behavior if code-hash computation is not available (fallback to mtime-only invalidation).
+  - Recommended follow-up: add unit tests for cache invalidation (cache preserved when only data changes; invalidated when code changes) and add explicit logging messages when a cache is rejected due to a code-hash mismatch.

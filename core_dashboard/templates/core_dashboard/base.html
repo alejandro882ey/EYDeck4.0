@@ -352,6 +352,35 @@
             padding-bottom: 10px;
         }
 
+        /* Scoped responsive rule for preview pages to avoid extra right-side whitespace */
+        .preview-centered {
+            box-sizing: border-box; /* include padding in width calculations */
+            padding-left: 1rem;
+            padding-right: 1rem;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            max-width: none; /* allow it to expand into main-panel space */
+            overflow-x: hidden; /* guard against accidental horizontal overflow */
+        }
+
+        /* On medium and larger screens let the preview take the available main-panel width (account for sidebar) */
+        @media (min-width: 992px) {
+            .preview-centered {
+                /* main-panel has a left offset of 260px for the sidebar; subtract some padding for breathing room */
+                width: calc(100% - 300px);
+                padding-left: 2rem;
+                padding-right: 2rem;
+            }
+        }
+
+        /* Slightly increase on ultra-wide screens */
+        @media (min-width: 1600px) {
+            .preview-centered {
+                width: calc(100% - 340px);
+            }
+        }
+
     </style>
     {% block extra_css %}{% endblock %}
 </head>

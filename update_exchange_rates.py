@@ -4,8 +4,8 @@ from datetime import datetime
 import os
 
 # Configuration
-# The script now looks for the Excel file in the same directory as the script itself.
-EXCEL_FILE_PATH = os.path.join(os.path.dirname(__file__), 'Historial_TCBinance.xlsx')
+# The script now looks for the Excel file in the dolar excel directory.
+EXCEL_FILE_PATH = os.path.join(os.path.dirname(__file__), 'dolar excel', 'Historial_TCBinance.xlsx')
 OFICIAL_API_URL = "https://ve.dolarapi.com/v1/dolares/oficial"
 PARALELO_API_URL = "https://ve.dolarapi.com/v1/dolares/paralelo"
 

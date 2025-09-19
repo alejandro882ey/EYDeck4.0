@@ -1,5 +1,6 @@
 {% extends "core_dashboard/base.html" %}
 
+{% load format_filters %}
 {% block content %}
 {% load progress_bar humanize %}
 <style>
@@ -58,6 +59,119 @@
         padding: .5rem;
     }
 
+    /* Creative info circles styling */
+    .info-circle {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 20px;
+    }
+
+    .circle-container {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #007BFF, #0056B3);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        /* Placeholder KPI tables (frontend-only, always visible) */
+
+    }
+
+    .circle-container:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4);
+    }
+
+    .circle-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: white;
+        line-height: 1;
+    }
+
+    .circle-label {
+        font-size: 0.8rem;
+        color: white;
+        margin-top: 2px;
+        text-align: center;
+        opacity: 0.9;
+    }
+
+    /* Grey bubble styles */
+    .info-circle-grey {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 20px;
+    }
+
+    .circle-container-grey {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #6c757d, #495057);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .circle-container-grey:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
+    }
+
+    .circle-number-white {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: white;
+        line-height: 1;
+    }
+
+    .circle-label-white {
+        font-size: 0.8rem;
+        color: white;
+        margin-top: 2px;
+        text-align: center;
+        opacity: 0.9;
+    }
+
+    @media (max-width: 768px) {
+        .info-circle {
+            margin: 10px 0;
+        }
+        .circle-container {
+            width: 80px;
+            height: 80px;
+        }
+        .info-circle-grey {
+            margin: 10px 0;
+        }
+        .circle-container-grey {
+            width: 80px;
+            height: 80px;
+        }
+        .circle-number {
+            font-size: 1.4rem;
+        }
+        .circle-label {
+            font-size: 0.7rem;
+        }
+        .d-flex.justify-content-around {
+            flex-direction: column;
+            align-items: center;
+        }
+    }
+
     #filterBody {
         min-height: 150px; /* Ensure filter body has a minimum height */
     }
@@ -79,6 +193,28 @@
         line-height: 1.02;
         font-weight: 700;
     }
+
+    /* Pill badges that sit under the main KPI number and above goal tracker */
+    .macro-pill-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin: .5rem 0; flex-wrap: wrap; }
+    .macro-pill { padding: 4px 10px; border-radius: 999px; font-size: .75rem; color: #ffffff !important; display: inline-block; }
+    .macro-pill, .macro-pill * { color: #ffffff !important; }
+    .macro-pill--blue { background: var(--ey-blue, #007bff); }
+    .macro-pill--red { background: var(--ey-danger, #d9534f); }
+    /* Ensure explicit color visibility even when other themes or rules apply */
+    .macro-pill--blue, .macro-pill--blue * {
+        background-color: var(--ey-blue, #007bff) !important;
+        color: #ffffff !important;
+    }
+    .macro-pill--red, .macro-pill--red * {
+        background-color: var(--ey-danger, #d9534f) !important;
+        color: #ffffff !important;
+    }
+    @media (max-width: 576px) { .macro-pill-row { flex-direction: column; gap: 4px; } }
+
+    /* Previous-year tracker (thin progress bar that sits above the main goal/progress) */
+    .prev-year-tracker .progress { height: 8px; background-color: rgba(255,255,255,0.08); }
+    .prev-year-tracker .progress .progress-bar { height: 8px; }
+    .prev-year-tracker small { display: block; margin-top: 6px; font-size: 0.85rem; }
 
     .macro-row .card-header {
         font-size: 0.9rem;
@@ -123,7 +259,91 @@
     /* Visual polish for flip-cards: card-like look, rounded corners and hidden overflow so inner scroll works */
     .ranking-col .flip-card { width: 100%; display: block; overflow: hidden; border-radius: .25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
     .flip-card-front .card-header, .flip-card-back .card-title { padding: .6rem .75rem; }
+    
+    /* Exchange Rate in Overview Header Styling */
+    .overview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    
+    .exchange-rate-info {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: white;
+        opacity: 0.95;
+    }
+    
+    .exchange-rate-info .rate-item {
+        margin-left: 20px;
+    }
+    
+    /* Styling for Overview Dashboard section title */
+    .overview-dashboard-header .section-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    
+    .overview-dashboard-header .exchange-rate-info {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--ey-yellow);
+        opacity: 1;
+    }
+    
+    /* Animation for updated exchange rates */
+    @keyframes pulse {
+        0% { 
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); 
+        }
+        70% { 
+            box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); 
+        }
+        100% { 
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); 
+        }
+    }
+    /* Reduce the size of the prominent KPI numbers when .small-number is used */
+    .small-number {
+        font-size: 0.85rem; /* further reduced so numbers fit the card */
+        line-height: 1.05;
+        margin: 0;
+        font-weight: 600;
+    }
+    /* Adjusted size for first two macro rows (increased 3x from previous compact value) */
+    .compact-numbers .kpi-card-value,
+    .compact-numbers .small-number {
+        font-size: 1.95rem !important; /* 0.65rem * 3 */
+        line-height: 1.05 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Prevent the Exchange Rate chart from overlapping other blocks.
+       Ensure the chart container has a stable height and clears previous floats. */
+    #exchangeRateChart {
+        min-height: 320px; /* reserve vertical space so chart doesn't float over tables */
+        width: 100% !important;
+        display: block;
+        clear: both;
+        box-sizing: border-box;
+    }
+
+    /* Ensure responsive Plotly resizing won't use absolute positioning that could cause overlap */
+    .plotly-graph-div { position: relative !important; }
 </style>
+
+<!-- Overview Dashboard Title with Exchange Rates -->
+<div class="overview-dashboard-header">
+    <h3 class="section-title">
+        <span>Tipo de Cambio [{% now "Y-m-d" %}]</span>
+        <span class="exchange-rate-info">
+            Oficial: ${{ latest_tasa_oficial|format_number }} | Binance: ${{ latest_tasa_binance|format_number }}
+        </span>
+    </h3>
+</div>
 
 <h3 class="section-title">Data Filtering</h3>
 <!-- Filter Section -->
@@ -200,138 +420,199 @@
         </div>
     </div>
 </div>
+    <!-- Placeholder KPI tables removed from here; moved under the Key Performance Indicators section -->
 
-{% if partner_spec_data %}
+{% if partner_spec_data and not sl_cards %}
 <h3 class="section-title">Partner Specification: {{ selected_partner }}</h3>
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Number of Engagements</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ partner_spec_data.num_engagements }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Number of Clients</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ partner_spec_data.num_clients }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Revenue Days</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ partner_spec_data.revenue_days }}</h3>
-            </div>
-        </div>
-    </div>
-    {% if partner_spec_data.mtd_ansr_amt %}
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">MTD ANSR (Client: {{ selected_client }})</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ partner_spec_data.mtd_ansr_amt }}</h3>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    <div class="col-md-3">
-        <div class="card text-center">
+
+<!-- Main KPI Cards in 2x2 layout -->
+<div class="row mb-4 macro-row">
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card">
             <div class="card-header">FYTD ANSR</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_fytd_ansr_value|floatformat:0|intcomma }}</h3>
+                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_fytd_ansr_value|format_number }}</h3>
                 <div class="progress mt-2">
-                    {% with completion=partner_spec_data.partner_fytd_ansr_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=partner_spec_data.partner_fytd_ansr_completion_percentage style_pct=partner_spec_data.partner_fytd_ansr_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ style_pct }}%;" aria-valuenow="{{ style_pct }}" aria-valuemin="0" aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">(${% if partner_spec_data.partner_fytd_ansr_goal %}{{ partner_spec_data.partner_fytd_ansr_goal|floatformat:0 }}{% else %}0{% endif %})</small>
+                <small class="text-white d-block">Goal: ${% if partner_spec_data.partner_fytd_ansr_goal %}{{ partner_spec_data.partner_fytd_ansr_goal|format_number }}{% else %}0{% endif %}</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card">
             <div class="card-header">MTD ANSR</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_mtd_ansr_value|floatformat:0|intcomma }}</h3>
+                <h3 class="card-title kpi-card-value">${{ partner_spec_data.partner_mtd_ansr_value|format_number }}</h3>
                 <div class="progress mt-2">
-                    {% with completion=partner_spec_data.partner_mtd_ansr_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=partner_spec_data.partner_mtd_ansr_completion_percentage style_pct=partner_spec_data.partner_mtd_ansr_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ style_pct }}%;" aria-valuenow="{{ style_pct }}" aria-valuemin="0" aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">(${% if partner_spec_data.partner_mtd_ansr_goal %}{{ partner_spec_data.partner_mtd_ansr_goal|floatformat:0 }}{% else %}0{% endif %})</small>
+                <small class="text-white d-block">Goal: ${% if partner_spec_data.partner_mtd_ansr_goal %}{{ partner_spec_data.partner_mtd_ansr_goal|format_number }}{% else %}0{% endif %}</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-header">Horas Cargadas (FYTD)</div>
+</div>
+
+<div class="row mb-4 macro-row">
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card">
+            <div class="card-header">Horas Cargadas (YTD)</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ partner_spec_data.partner_fytd_charged_hours|floatformat:1 }}</h3>
+                <h3 class="card-title kpi-card-value">{{ partner_spec_data.partner_fytd_charged_hours|format_number }}</h3>
                 <div class="progress mt-2">
-                    {% with completion=partner_spec_data.partner_fytd_hours_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=partner_spec_data.partner_fytd_hours_completion_percentage style_pct=partner_spec_data.partner_fytd_hours_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ style_pct }}%;" aria-valuenow="{{ style_pct }}" aria-valuemin="0" aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">({% if partner_spec_data.partner_fytd_hours_goal %}{{ partner_spec_data.partner_fytd_hours_goal|floatformat:0 }}{% else %}0{% endif %})</small>
+                <small class="text-white d-block">Goal: {% if partner_spec_data.partner_fytd_hours_goal %}{{ partner_spec_data.partner_fytd_hours_goal|format_number }}{% else %}0{% endif %}</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card">
             <div class="card-header">Horas Cargadas (MTD)</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ partner_spec_data.partner_mtd_charged_hours|floatformat:1 }}</h3>
+                <h3 class="card-title kpi-card-value">{{ partner_spec_data.partner_mtd_charged_hours|format_number }}</h3>
                 <div class="progress mt-2">
-                    {% with completion=partner_spec_data.partner_mtd_hours_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=partner_spec_data.partner_mtd_hours_completion_percentage style_pct=partner_spec_data.partner_mtd_hours_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ style_pct }}%;" aria-valuenow="{{ style_pct }}" aria-valuemin="0" aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white">({% if partner_spec_data.partner_mtd_hours_goal %}{{ partner_spec_data.partner_mtd_hours_goal|floatformat:0 }}{% else %}0{% endif %})</small>
+                <small class="text-white d-block">Goal: {% if partner_spec_data.partner_mtd_hours_goal %}{{ partner_spec_data.partner_mtd_hours_goal|format_number }}{% else %}0{% endif %}</small>
             </div>
         </div>
     </div>
-    <!-- Display FYTD_ChargedHours and MTD_Charged in the filter per partner -->
-    <div class="col-md-6">
+</div>
+
+<!-- Creative Info Display -->
+<div class="row mb-4">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">Charged Hours by Partner</div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                <div class="table-responsive">
-                    <table class="table table-dark table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Partner</th>
-                                <th scope="col">Horas Cargadas (FYTD)</th>
-                                <th scope="col">Horas Cargadas (MTD)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for fytd_entry in fytd_charged_hours_by_partner_with_labels %}
-                            <tr>
-                                <td>{{ fytd_entry.engagement_partner }}</td>
-                                <td>{{ fytd_entry.total_fytd_charged_hours|floatformat:1 }}</td>
-                                <td>
-                                    {% for mtd_entry in mtd_charged_hours_by_partner_with_labels %}
-                                        {% if mtd_entry.engagement_partner == fytd_entry.engagement_partner %}
-                                            {{ mtd_entry.total_mtd_charged_hours|floatformat:1 }}
-                                        {% endif %}
-                                    {% endfor %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <div class="card-header">Partner Overview</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-around align-items-center text-center">
+                    <div class="info-circle">
+                        <div class="circle-container">
+                            <div class="circle-number">{{ partner_spec_data.num_engagements|format_number }}</div>
+                            <div class="circle-label">Engagements</div>
+                        </div>
+                    </div>
+                    <div class="info-circle">
+                        <div class="circle-container">
+                            <div class="circle-number">{{ partner_spec_data.num_clients|format_number }}</div>
+                            <div class="circle-label">Clients</div>
+                        </div>
+                    </div>
+                    <div class="info-circle">
+                        <div class="circle-container">
+                                <div class="circle-number">{{ partner_spec_data.revenue_days|format_number }}</div>
+                            <div class="circle-label">Revenue Days</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+<!-- Top 5 Managers by Revenue (with flip functionality and charged hours) -->
+<div class="row mb-4">
     <div class="col-md-6">
+        <div class="flip-card h-100" id="partnerManagersFlipCard" role="button" tabindex="0" aria-pressed="false">
+            <div class="flip-card-inner">
+                <div class="flip-card-front">
+                    <div class="card-header w-100">Top 5 Managers by Revenue</div>
+                    <div class="card-body w-100" style="overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            {% for manager in top_managers|slice:":5" %}
+                            <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                                {{ manager.label }}
+                                <span class="badge bg-primary rounded-pill">${{ manager.total_revenue|format_number }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="flip-card-back">
+                    <h5 class="card-title">All Managers by Revenue & Charged Hours</h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Manager</th>
+                                    <th scope="col">Revenue</th>
+                                    <th scope="col">FYTD Hours</th>
+                                    <th scope="col">MTD Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for manager in all_managers_ranked %}
+                                <tr>
+                                    <td>{{ manager.label }}</td>
+                                    <td>${{ manager.total_revenue|format_number }}</td>
+                                    <td>
+                                        {% for manager_fytd in fytd_charged_hours_by_manager %}
+                                            {% if manager_fytd.engagement_manager == manager.label %}
+                                                {{ manager_fytd.total_fytd_charged_hours|format_number }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% for manager_mtd in mtd_charged_hours_by_manager %}
+                                            {% if manager_mtd.engagement_manager == manager.label %}
+                                                {{ manager_mtd.total_mtd_charged_hours|format_number }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Total Perdida Diferencial YTD -->
+    <div class="col-md-6">
+        <div class="card text-center h-100">
+            <div class="card-header">Total Perdida Diferencial YTD</div>
+            <div class="card-body">
+                <h3 class="card-title kpi-card-value">${{ partner_spec_data.total_perdida_diferencial|format_number }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Perdida Diferencial by Client -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">Perdida Diferencial by Client</div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <ul class="list-group list-group-flush">
+                    {% for item in partner_spec_data.perdida_per_client %}
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                        {{ item.client_name }}
+                        <span class="badge bg-danger rounded-pill">${{ item.perdida|format_number }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Client List & Revenue - moved to the end -->
+<div class="row mb-4">
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header">Client List & Revenue</div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
                 <ul class="list-group list-group-flush">
                     {% for client in partner_spec_data.client_list %}
                     <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
@@ -343,183 +624,454 @@
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">Charged Hours by Manager</div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                <div class="table-responsive">
-                    <table class="table table-dark table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Manager</th>
-                                <th scope="col">FYTD Charged Hours</th>
-                                <th scope="col">MTD Charged Hours</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for manager_fytd in fytd_charged_hours_by_manager %}
-                            <tr>
-                                <td>{{ manager_fytd.engagement_manager }}</td>
-                                <td>{{ manager_fytd.total_fytd_charged_hours|floatformat:1 }}</td>
-                                <td>
-                                    {% for manager_mtd in mtd_charged_hours_by_manager %}
-                                        {% if manager_mtd.engagement_manager == manager_fytd.engagement_manager %}
-                                            {{ manager_mtd.total_mtd_charged_hours|floatformat:1 }}
-                                        {% endif %}
-                                    {% endfor %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    </div>
+
+    <!-- Placeholder KPI tables removed from here; will be placed under Key Performance Indicators so they're visible on the main dashboard -->
+
+    </div>
+{% endif %}
+
+
+
+{# Service Line / Sub Service Line / Manager conditional block - simplified and balanced #}
+{% if sl_cards %}
+<h3 class="section-title">Service Line: {{ selected_area }}</h3>
+
+<!-- SL cards in the exact requested order: ANSR YTD, Horas Cargadas YTD, ANSR MTD, Horas Cargadas MTD -->
+<div class="row mb-4 macro-row">
+    {% for card in sl_cards %}
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card">
+            <div class="card-header">{{ card.label }}</div>
+            <div class="card-body">
+                {% if card.key == 'ANSR_YTD' or card.key == 'ANSR_MTD' %}
+                    <h3 class="card-title kpi-card-value">${{ card.value|format_number }}</h3>
+                {% else %}
+                    <h3 class="card-title kpi-card-value">{{ card.value|format_number }}</h3>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% elif ssl_cards %}
+<h3 class="section-title">Sub Service Line: {{ selected_sub_area }}</h3>
+
+<!-- SSL cards: same order and formatting as SL cards -->
+<div class="row mb-4 macro-row">
+    {% for card in ssl_cards %}
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card">
+            <div class="card-header">{{ card.label }}</div>
+            <div class="card-body">
+                {% if card.key == 'ANSR_YTD' or card.key == 'ANSR_MTD' %}
+                    <h3 class="card-title kpi-card-value">${{ card.value|format_number }}</h3>
+                {% else %}
+                    <h3 class="card-title kpi-card-value">{{ card.value|format_number }}</h3>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+
+    {% if manager_spec_data %}
+    <h3 class="section-title">Manager Specification: {{ selected_manager }}</h3>
+
+    <!-- Main KPI Cards in 2x2 layout with Goals -->
+    <div class="row mb-4 macro-row">
+        <div class="col-md-6 col-sm-12 mb-2">
+            <div class="card text-center h-100 macro-card">
+                <div class="card-header">ANSR YTD</div>
+                <div class="card-body">
+                    <h3 class="card-title kpi-card-value">${{ manager_spec_data.manager_fytd_ansr_value|format_number }}</h3>
+                    <small class="text-white d-block">Goal: ${% if manager_spec_data.manager_fytd_ansr_goal %}{{ manager_spec_data.manager_fytd_ansr_goal|format_number }}{% else %}0{% endif %}</small>
+                    <div class="progress mt-2">
+                        {% with completion=manager_spec_data.manager_fytd_ansr_completion_percentage style_pct=manager_spec_data.manager_fytd_ansr_completion_percentage_style %}
+                        <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ style_pct }}%;" 
+                             aria-valuenow="{{ style_pct }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {% if completion > 0 %}{{ completion|format_number }}%{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-sm-12 mb-2">
+            <div class="card text-center h-100 macro-card">
+                <div class="card-header">Horas Cargadas YTD</div>
+                <div class="card-body">
+                    <h3 class="card-title kpi-card-value">{{ manager_spec_data.manager_fytd_charged_hours|format_number }}</h3>
+                    <small class="text-white d-block">Goal: {% if manager_spec_data.manager_fytd_hours_goal %}{{ manager_spec_data.manager_fytd_hours_goal|format_number }}{% else %}0{% endif %}</small>
+                    <div class="progress mt-2">
+                        {% with completion=manager_spec_data.manager_fytd_hours_completion_percentage style_pct=manager_spec_data.manager_fytd_hours_completion_percentage_style %}
+                        <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ style_pct }}%;" 
+                             aria-valuenow="{{ style_pct }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {% if completion > 0 %}{{ completion|format_number }}%{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-header">Total Perdida Diferencial</div>
-            <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ partner_spec_data.total_perdida_diferencial|floatformat:0|intcomma }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">Perdida Diferencial by Client</div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                <ul class="list-group list-group-flush">
-                    {% for item in partner_spec_data.perdida_per_client %}
-                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
-                        {{ item.client_name }}
-                        <span class="badge bg-danger rounded-pill">${{ item.perdida|floatformat:0|intcomma }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">Top 5 Engagements by Perdida Diferencial</div>
-            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                <ul class="list-group list-group-flush">
-                    {% for item in partner_spec_data.top_engagements_perdida %}
-                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
-                        {{ item.engagement_name }}
-                        <span class="badge bg-danger rounded-pill">${{ item.perdida|floatformat:0|intcomma }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 
-{% if not selected_partner %}
+    <div class="row mb-4 macro-row">
+        <div class="col-md-6 col-sm-12 mb-2">
+            <div class="card text-center h-100 macro-card">
+                <div class="card-header">ANSR MTD</div>
+                <div class="card-body">
+                    <h3 class="card-title kpi-card-value">${{ manager_spec_data.manager_mtd_ansr_value|format_number }}</h3>
+                    <small class="text-white d-block">Goal: ${% if manager_spec_data.manager_mtd_ansr_goal %}{{ manager_spec_data.manager_mtd_ansr_goal|format_number }}{% else %}0{% endif %}</small>
+                    <div class="progress mt-2">
+                        {% with completion=manager_spec_data.manager_mtd_ansr_completion_percentage style_pct=manager_spec_data.manager_mtd_ansr_completion_percentage_style %}
+                        <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ style_pct }}%;" 
+                             aria-valuenow="{{ style_pct }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {% if completion > 0 %}{{ completion|format_number }}%{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-sm-12 mb-2">
+            <div class="card text-center h-100 macro-card">
+                <div class="card-header">Horas Cargadas MTD</div>
+                <div class="card-body">
+                    <h3 class="card-title kpi-card-value">{{ manager_spec_data.manager_mtd_charged_hours|format_number }}</h3>
+                    <small class="text-white d-block">Goal: {% if manager_spec_data.manager_mtd_hours_goal %}{{ manager_spec_data.manager_mtd_hours_goal|format_number }}{% else %}0{% endif %}</small>
+                    <div class="progress mt-2">
+                        {% with completion=manager_spec_data.manager_mtd_hours_completion_percentage style_pct=manager_spec_data.manager_mtd_hours_completion_percentage_style %}
+                        <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ style_pct }}%;" 
+                             aria-valuenow="{{ style_pct }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {% if completion > 0 %}{{ completion|format_number }}%{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perdida Diferencial cards removed per user preference -->
+
+    <!-- Manager Overview - Grey Bubbles with White Text -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">Manager Overview</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-around align-items-center text-center">
+                        <div class="info-circle-grey">
+                            <div class="circle-container-grey">
+                                <div class="circle-number-white">{{ manager_spec_data.num_clients|format_number }}</div>
+                                <div class="circle-label-white">Clients</div>
+                            </div>
+                        </div>
+                        <div class="info-circle-grey">
+                            <div class="circle-container-grey">
+                                <div class="circle-number-white">{{ manager_spec_data.num_engagements|format_number }}</div>
+                                <div class="circle-label-white">Engagements</div>
+                            </div>
+                        </div>
+                        <div class="info-circle-grey">
+                            <div class="circle-container-grey">
+                                <div class="circle-number-white">{{ manager_spec_data.revenue_days|format_number }}</div>
+                                <div class="circle-label-white">Revenue Days</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row mb-4">
+        <!-- Top 5 Clients by Revenue with Flip Functionality -->
+        <div class="col-md-6">
+            <div class="flip-card h-100" id="managerClientsFlipCard" role="button" tabindex="0" aria-pressed="false">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front">
+                        <div class="card-header w-100">Top 5 Clients by Revenue</div>
+                        <div class="card-body w-100" style="overflow-y: auto;">
+                            <ul class="list-group list-group-flush">
+                                {% for client in manager_spec_data.top_clients %}
+                                <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                                    {{ client.client_name }}
+                                    <span class="badge bg-primary rounded-pill">${{ client.revenue|format_number }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="flip-card-back">
+                        <h5 class="card-title">All Clients Ranking</h5>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Client</th>
+                                        <th scope="col">Revenue</th>
+                                        <th scope="col">Horas MTD</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for client in manager_spec_data.all_clients %}
+                                    <tr>
+                                        <td>{{ client.client_name }}</td>
+                                        <td>${{ client.revenue|format_number }}</td>
+                                        <td>{{ client.mtd_hours|format_number }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top 5 Engagements by Perdida Diferencial with Flip Functionality -->
+        <div class="col-md-6">
+            <div class="flip-card h-100" id="managerEngagementsFlipCard" role="button" tabindex="0" aria-pressed="false">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front">
+                        <div class="card-header w-100">Top 5 Engagements by Perdida Diferencial</div>
+                        <div class="card-body w-100" style="overflow-y: auto;">
+                            <ul class="list-group list-group-flush">
+                                {% for engagement in manager_spec_data.top_engagements %}
+                                <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                                    {{ engagement.engagement_name }}
+                                    <span class="badge bg-danger rounded-pill">${{ engagement.perdida|format_number }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="flip-card-back">
+                        <h5 class="card-title">All Engagements by Perdida Diferencial</h5>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Engagement</th>
+                                        <th scope="col">Perdida Diferencial</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for engagement in manager_spec_data.all_engagements %}
+                                    <tr>
+                                        <td>{{ engagement.engagement_name }}</td>
+                                        <td>${{ engagement.perdida|format_number }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+{% endif %}
 <h3 class="section-title">Macro</h3>
 
-<!-- First row: YTD values (ANSR, Horas, Margin) -->
-<div class="row mb-3 macro-row">
-    <div class="col-md-4 col-sm-12 mb-2">
+<!-- First row: 4 cards - ANSR YTD, Horas Cargadas (YTD), RPH YTD, Margin YTD -->
+<div class="row mb-3 macro-row compact-numbers">
+    <div class="col-md-3 col-sm-12 mb-2">
         <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
             <div class="card-header">ANSR YTD</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ ansr_fytd_value|floatformat:0|intcomma }}</h3>
+                <h4 class="card-title kpi-card-value small-number">${{ ansr_fytd_value|format_number }}</h4>
+                <div class="prev-year-tracker">
+                    <div class="progress">
+                        {% if ansr_fytd_prev_year_pct_style is defined %}
+                            <div class="progress-bar {{ ansr_fytd_prev_year_color|default:'bg-secondary' }} d-flex justify-content-center align-items-center" role="progressbar" style="width: {{ ansr_fytd_prev_year_pct_style }}%;" aria-valuenow="{{ ansr_fytd_prev_year_pct_style }}" aria-valuemin="0" aria-valuemax="100">
+                                {% if ansr_fytd_prev_year_pct is defined and ansr_fytd_prev_year_pct %}
+                                    <span class="fw-bold" style="font-size:0.75rem; color:rgba(255,255,255,0.95);">{{ ansr_fytd_prev_year_pct|floatformat:1 }}%</span>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="progress-bar bg-secondary" role="progressbar" style="width:0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        {% endif %}
+                    </div>
+                    <small class="text-white">Año Anterior: <strong>{% if ansr_fytd_prev_year is defined and ansr_fytd_prev_year %}{{ ansr_fytd_prev_year|format_number }}{% else %}-{% endif %}</strong></small>
+                </div>
                 <div class="progress mt-2">
-                    {% with completion=ansr_fytd_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=ansr_fytd_completion_percentage style_pct=ansr_fytd_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ style_pct }}%;" aria-valuenow="{{ style_pct }}" aria-valuemin="0" aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white d-block">(${{ ansr_fytd_goal|floatformat:0|intcomma }})</small>
+                <small class="text-white d-block">Goal: ${{ ansr_fytd_goal|format_number }}</small>
                 <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
             </div>
         </div>
     </div>
-    <div class="col-md-4 col-sm-12 mb-2">
+    <div class="col-md-3 col-sm-12 mb-2">
         <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
             <div class="card-header">Horas Cargadas (YTD)</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ total_fytd_charged_hours }}</h3>
+                <h4 class="card-title kpi-card-value small-number">{{ total_fytd_charged_hours }}</h4>
+                {# prev-year tracker removed for this card (Horas Cargadas YTD) per design - will add backend later if needed #}
                 <div class="progress mt-2">
-                    {% with completion=hours_fytd_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=hours_fytd_completion_percentage style_pct=hours_fytd_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ style_pct }}%;" aria-valuenow="{{ style_pct }}" aria-valuemin="0" aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white d-block">({{ hours_fytd_goal|floatformat:0 }})</small>
-                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+                <small class="text-white d-block">Goal: {{ hours_fytd_goal|format_number }}</small>
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
             </div>
         </div>
     </div>
-    <div class="col-md-4 col-sm-12 mb-2">
+    <div class="col-md-3 col-sm-12 mb-2">
         <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
-            <div class="card-header">Margin</div>
+            <div class="card-header">RPH YTD</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ macro_margin_percentage_value|floatformat:0 }}%</h3>
-                <small class="text-white d-block mt-2">${{ macro_margin_value|default:0|floatformat:0|intcomma }}</small>
-                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+                <h4 class="card-title kpi-card-value small-number">${{ macro_rph_value|format_number }}</h4>
+                {# prev-year tracker removed for this card (RPH) per design - will add backend later if needed #}
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">Margin YTD</div>
+            <div class="card-body">
+                <h4 class="card-title kpi-card-value small-number">{{ macro_margin_percentage_value|format_number }}%</h4>
+                {# prev-year tracker removed for this card (Margin) per design - will add backend later if needed #}
+                <small class="text-white d-block mt-2">${{ macro_margin_value|default:0|format_number }}</small>
+                <!-- This card previously linked to the Cobranzas preview. Removed duplicate link to keep only the main Cobranzas card button. -->
             </div>
         </div>
     </div>
 </div>
 
-<!-- Second row: MTD values (ANSR MTD under ANSR YTD, Horas MTD under Horas YTD, Perdida under Margin) -->
-<div class="row mb-3 macro-row">
-    <div class="col-md-4 col-sm-12 mb-2">
+<!-- Second row: 4 cards - ANSR MTD, Horas Cargadas (MTD), RPH MTD, Margin MTD -->
+<div class="row mb-3 macro-row compact-numbers">
+    <div class="col-md-3 col-sm-12 mb-2">
         <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
             <div class="card-header">ANSR MTD</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ ansr_mtd_value|floatformat:0|intcomma }}</h3>
+                <h4 class="card-title kpi-card-value small-number">${{ ansr_mtd_value|format_number }}</h4>
+                <div class="prev-year-tracker">
+                    <div class="progress">
+                        {% if ansr_mtd_prev_year_pct_style is defined %}
+                            <div class="progress-bar {{ ansr_mtd_prev_year_color|default:'bg-secondary' }} d-flex justify-content-center align-items-center" role="progressbar" style="width: {{ ansr_mtd_prev_year_pct_style }}%;" aria-valuenow="{{ ansr_mtd_prev_year_pct_style }}" aria-valuemin="0" aria-valuemax="100">
+                                {% if ansr_mtd_prev_year_pct is defined and ansr_mtd_prev_year_pct %}
+                                    <span class="fw-bold" style="font-size:0.75rem; color:rgba(255,255,255,0.95);">{{ ansr_mtd_prev_year_pct|floatformat:1 }}%</span>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="progress-bar bg-secondary" role="progressbar" style="width:0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        {% endif %}
+                    </div>
+                    <small class="text-white">Año Anterior: <strong>{% if ansr_mtd_prev_year is defined and ansr_mtd_prev_year %}{{ ansr_mtd_prev_year|format_number }}{% else %}-{% endif %}</strong></small>
+                </div>
                 <div class="progress mt-2">
-                    {% with completion=ansr_mtd_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=ansr_mtd_completion_percentage style_pct=ansr_mtd_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}"
+                         role="progressbar"
+                         style="width: {{ style_pct }}%;"
+                         aria-valuenow="{{ style_pct }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white d-block">(${{ ansr_mtd_goal|floatformat:0|intcomma }})</small>
-                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+                <small class="text-white d-block">Goal: ${{ ansr_mtd_goal|format_number }}</small>
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
             </div>
         </div>
     </div>
-    <div class="col-md-4 col-sm-12 mb-2">
+    <div class="col-md-3 col-sm-12 mb-2">
         <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
             <div class="card-header">Horas Cargadas (MTD)</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">{{ total_mtd_charged_hours }}</h3>
+                <h4 class="card-title kpi-card-value small-number">{{ total_mtd_charged_hours }}</h4>
+                {# prev-year tracker removed for this card (Horas Cargadas MTD) per design - will add backend later if needed #}
                 <div class="progress mt-2">
-                    {% with completion=hours_mtd_completion_percentage %}
-                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}" role="progressbar" style="width: {{ completion }}%;" aria-valuenow="{{ completion }}" aria-valuemin="0" aria-valuemax="100">{{ completion|floatformat:0 }}%</div>
+                    {% with completion=hours_mtd_completion_percentage style_pct=hours_mtd_completion_percentage_style %}
+                    <div class="progress-bar {% if completion >= 95 %}bg-success{% elif completion >= 50 %}bg-warning{% else %}bg-danger{% endif %} {% if completion == 0 %}text-dark{% else %}text-white{% endif %}"
+                         role="progressbar"
+                         style="width: {{ style_pct }}%;"
+                         aria-valuenow="{{ style_pct }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100">{{ completion|format_number }}%</div>
                     {% endwith %}
                 </div>
-                <small class="text-white d-block">({{ hours_mtd_goal|floatformat:0 }})</small>
-                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+                <small class="text-white d-block">Goal: {{ hours_mtd_goal|format_number }}</small>
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
             </div>
         </div>
     </div>
-    <div class="col-md-4 col-sm-12 mb-2">
+    <div class="col-md-3 col-sm-12 mb-2">
         <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
-            <div class="card-header">Perdida Diferencial</div>
+            <div class="card-header">RPH MTD</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ macro_diferencial_final|floatformat:0|intcomma }}</h3>
-                <a class="btn btn-sm btn-secondary preview-btn position-absolute" style="left: .5rem; bottom: .5rem;" href="{% url 'data_downloads' %}?report_date={{ latest_report_date }}">Preview</a>
+                <h4 class="card-title kpi-card-value small-number">${{ macro_rph_mtd|format_number }}</h4>
+                {# prev-year tracker removed for this card (RPH MTD) per design - will add backend later if needed #}
+                <small class="text-white d-block mt-2">ANSR MTD / Horas MTD</small>
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">Margin MTD</div>
+            <div class="card-body">
+                <h4 class="card-title kpi-card-value small-number">{{ macro_mtd_margin_percentage|format_number }}%</h4>
+                {# prev-year tracker removed for this card (Margin MTD) per design - will add backend later if needed #}
+                <small class="text-white d-block mt-2">${{ macro_mtd_margin_value|format_number }}</small>
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
             </div>
         </div>
     </div>
 </div>
 
-<!-- RPH centered full-width bar below -->
+<!-- Cobranzas (Collected YTD) and Facturacion (Billed YTD) cards -->
 <div class="row mb-4 macro-row">
-    <div class="col-12">
-        <div class="card text-center">
-            <div class="card-header">RPH</div>
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">Cobranzas (Collected YTD)</div>
             <div class="card-body">
-                <h3 class="card-title kpi-card-value">${{ macro_rph_value|floatformat:1 }}</h3>
+                <h3 class="card-title kpi-card-value">${{ macro_collected_total|format_number }}</h3>
+                <a class="btn btn-sm btn-secondary preview-btn position-absolute cobranzas-preview" style="left: .5rem; bottom: .5rem;" href="{% url 'cobranzas:preview' %}" target="_blank" onclick="event.stopPropagation();">+ Info</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-sm-12 mb-2">
+        <div class="card text-center h-100 macro-card" data-report-date="{{ latest_report_date }}">
+            <div class="card-header">Facturacion (Billed YTD)</div>
+            <div class="card-body">
+                <h3 class="card-title kpi-card-value">${{ macro_billed_total|format_number }}</h3>
+                <!-- Preview removed as per design: keep only ANSR YTD and Cobranzas preview buttons -->
             </div>
         </div>
     </div>
 </div>
-{% endif %}
 
+{% if not selected_partner and not selected_manager and not sl_cards %}
 <h3 class="section-title">Key Performance Indicators</h3>
 
 <!-- Two-column layout: left column = Partners (top) / Engagements (bottom); right column = Managers (top) / Clients (bottom) -->
@@ -535,7 +1087,7 @@
                             {% for partner in top_partners %}
                             <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
                                 {{ partner.engagement_partner }}
-                                <span class="badge bg-primary rounded-pill">{{ partner.total_revenue }}</span>
+                                <span class="badge bg-primary rounded-pill">{{ partner.total_revenue|format_number }}</span>
                             </li>
                             {% endfor %}
                         </ul>
@@ -556,11 +1108,11 @@
                                 {% for partner in all_partners_ranked %}
                                 <tr>
                                     <td>{{ partner.engagement_partner }}</td>
-                                    <td>{{ partner.total_revenue }}</td>
+                                    <td>{{ partner.total_revenue|format_number }}</td>
                                     <td>
                                         {% for hours_entry in all_fytd_charged_hours_by_partner %}
                                             {% if hours_entry.engagement_partner == partner.engagement_partner %}
-                                                {{ hours_entry.total_fytd_charged_hours|floatformat:1 }}
+                                                {{ hours_entry.total_fytd_charged_hours|format_number }}
                                             {% endif %}
                                         {% endfor %}
                                     </td>
@@ -583,7 +1135,7 @@
                             {% for e in top_engagements %}
                             <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
                                 {{ e.label }}
-                                <span class="badge bg-primary rounded-pill">${{ e.total_revenue|floatformat:2 }}</span>
+                                <span class="badge bg-primary rounded-pill">${{ e.total_revenue|format_number }}</span>
                             </li>
                             {% endfor %}
                         </ul>
@@ -598,7 +1150,7 @@
                             </thead>
                             <tbody>
                                 {% for e in all_engagements_ranked %}
-                                <tr><td>{{ e.label }}</td><td>${{ e.total_revenue|floatformat:2 }}</td></tr>
+                                <tr><td>{{ e.label }}</td><td>${{ e.total_revenue|format_number }}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -619,7 +1171,7 @@
                             {% for m in top_managers %}
                             <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
                                 {{ m.label }}
-                                <span class="badge bg-primary rounded-pill">${{ m.total_revenue|floatformat:2 }}</span>
+                                <span class="badge bg-primary rounded-pill">${{ m.total_revenue|format_number }}</span>
                             </li>
                             {% endfor %}
                         </ul>
@@ -634,7 +1186,7 @@
                             </thead>
                             <tbody>
                                 {% for m in all_managers_ranked %}
-                                <tr><td>{{ m.label }}</td><td>${{ m.total_revenue|floatformat:2 }}</td></tr>
+                                <tr><td>{{ m.label }}</td><td>${{ m.total_revenue|format_number }}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -653,7 +1205,7 @@
                             {% for c in top_clients_rank %}
                             <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
                                 {{ c.label }}
-                                <span class="badge bg-primary rounded-pill">${{ c.total_revenue|floatformat:2 }}</span>
+                                <span class="badge bg-primary rounded-pill">${{ c.total_revenue|format_number }}</span>
                             </li>
                             {% endfor %}
                         </ul>
@@ -668,7 +1220,7 @@
                             </thead>
                             <tbody>
                                 {% for c in all_clients_ranked %}
-                                <tr><td>{{ c.label }}</td><td>${{ c.total_revenue|floatformat:2 }}</td></tr>
+                                <tr><td>{{ c.label }}</td><td>${{ c.total_revenue|format_number }}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -679,6 +1231,212 @@
     </div>
 </div>
 
+<!-- Placeholder KPI tables (Partners / Managers / Service Lines / Sub Service Lines) placed under Key Performance Indicators -->
+<div class="row ranking-row mt-3" style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+    <div class="ranking-col">
+        <div class="card h-100">
+            <div class="card-header">Partners vs. Meta vs. Average</div>
+            <div class="card-body table-responsive">
+                <table class="table table-dark table-striped table-hover mb-0">
+                    <thead>
+                        <tr><th>Partner</th><th>ANSR FYTD</th><th>Horas FYTD</th><th>RPH</th><th>Goal</th><th>Avg</th></tr>
+                    </thead>
+                    <tbody>
+                        {% if partners_ranking %}
+                            {% for p in partners_ranking %}
+                                <tr>
+                                    <td>{{ p.label }}</td>
+                                    <td>${{ p.ansr_fytd|format_number }}</td>
+                                    <td>{{ p.hours_fytd|format_number }}</td>
+                                    <td>${{ p.rph|format_number }}</td>
+                                    <td>
+                                        {% if p.goal %}
+                                            <span>${{ p.goal|format_number }}</span>
+                                            {% if p.goal_completion_percentage %}
+                                                <span class="badge {% if p.goal_color == 'red' %}bg-danger{% elif p.goal_color == 'yellow' %}bg-warning{% elif p.goal_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{{ p.goal_completion_percentage|format_number }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if p.avg_ansr %}
+                                            {% if p.comparison_pct %}
+                                                <span>{{ p.comparison_pct|format_number }}%</span>
+                                                <span class="badge {% if p.comparison_color == 'red' %}bg-danger{% elif p.comparison_color == 'yellow' %}bg-warning{% elif p.comparison_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">&nbsp;</span>
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="6" class="text-center text-muted">No data yet</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="ranking-col">
+        <div class="card h-100">
+            <div class="card-header">Managers vs. Meta vs. Average</div>
+            <div class="card-body table-responsive">
+                <table class="table table-dark table-striped table-hover mb-0">
+                    <thead>
+                        <tr><th>Manager</th><th>ANSR FYTD</th><th>Horas FYTD</th><th>RPH</th><th>Goal</th><th>Avg</th></tr>
+                    </thead>
+                    <tbody>
+                        {% if managers_ranking %}
+                            {% for m in managers_ranking %}
+                                <tr>
+                                    <td>{{ m.label }}</td>
+                                    <td>${{ m.ansr_fytd|format_number }}</td>
+                                    <td>{{ m.hours_fytd|format_number }}</td>
+                                    <td>${{ m.rph|format_number }}</td>
+                                    <td>
+                                        {% if m.goal %}
+                                            <span>${{ m.goal|format_number }}</span>
+                                            {% if m.goal_completion_percentage %}
+                                                <span class="badge {% if m.goal_color == 'red' %}bg-danger{% elif m.goal_color == 'yellow' %}bg-warning{% elif m.goal_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{{ m.goal_completion_percentage|format_number }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if m.avg_ansr %}
+                                            {% if m.comparison_pct %}
+                                                <span>{{ m.comparison_pct|format_number }}%</span>
+                                                <span class="badge {% if m.comparison_color == 'red' %}bg-danger{% elif m.comparison_color == 'yellow' %}bg-warning{% elif m.comparison_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">&nbsp;</span>
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="6" class="text-center text-muted">No data yet</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="ranking-col">
+        <div class="card h-100">
+            <div class="card-header">Service Lines vs. Meta vs. Average</div>
+            <div class="card-body table-responsive">
+                <table class="table table-dark table-striped table-hover mb-0">
+                    <thead>
+                        <tr><th>Service Line</th><th>ANSR FYTD</th><th>Horas FYTD</th><th>RPH</th><th>Goal</th><th>Avg</th></tr>
+                    </thead>
+                    <tbody>
+                        {% if service_lines_ranking %}
+                            {% for s in service_lines_ranking %}
+                                <tr>
+                                    <td>{{ s.label }}</td>
+                                    <td>${{ s.ansr_fytd|format_number }}</td>
+                                    <td>{{ s.hours_fytd|format_number }}</td>
+                                    <td>${{ s.rph|format_number }}</td>
+                                    <td>
+                                        {% if s.goal %}
+                                            <span>${{ s.goal|format_number }}</span>
+                                            {% if s.goal_completion_percentage %}
+                                                <span class="badge {% if s.goal_color == 'red' %}bg-danger{% elif s.goal_color == 'yellow' %}bg-warning{% elif s.goal_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{{ s.goal_completion_percentage|format_number }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if s.avg_ansr %}
+                                            {% if s.comparison_pct %}
+                                                <span>{{ s.comparison_pct|format_number }}%</span>
+                                                <span class="badge {% if s.comparison_color == 'red' %}bg-danger{% elif s.comparison_color == 'yellow' %}bg-warning{% elif s.comparison_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">&nbsp;</span>
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="6" class="text-center text-muted">No data yet</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="ranking-col">
+        <div class="card h-100">
+            <div class="card-header">Sub Service Lines vs. Meta vs. Average</div>
+            <div class="card-body table-responsive">
+                <table class="table table-dark table-striped table-hover mb-0">
+                    <thead>
+                        <tr><th>Sub Service Line</th><th>ANSR FYTD</th><th>Horas FYTD</th><th>RPH</th><th>Goal</th><th>Avg</th></tr>
+                    </thead>
+                    <tbody>
+                        {% if sub_service_lines_ranking %}
+                            {% for ss in sub_service_lines_ranking %}
+                                <tr>
+                                    <td>{{ ss.label }}</td>
+                                    <td>${{ ss.ansr_fytd|format_number }}</td>
+                                    <td>{{ ss.hours_fytd|format_number }}</td>
+                                    <td>${{ ss.rph|format_number }}</td>
+                                    <td>
+                                        {% if ss.goal %}
+                                            <span>${{ ss.goal|format_number }}</span>
+                                            {% if ss.goal_completion_percentage %}
+                                                <span class="badge {% if ss.goal_color == 'red' %}bg-danger{% elif ss.goal_color == 'yellow' %}bg-warning{% elif ss.goal_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{{ ss.goal_completion_percentage|format_number }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ss.avg_ansr %}
+                                            {% if ss.comparison_pct %}
+                                                <span>{{ ss.comparison_pct|format_number }}%</span>
+                                                <span class="badge {% if ss.comparison_color == 'red' %}bg-danger{% elif ss.comparison_color == 'yellow' %}bg-warning{% elif ss.comparison_color == 'green' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">&nbsp;</span>
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="6" class="text-center text-muted">No data yet</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+    {# Duplicate placeholders removed - kept the primary set near the filter section #}
+{% endif %}
+
+{# Duplicate Rankings removed — content already displayed under Key Performance Indicators #}
+
+
+{# Note: retained a single conditional entry for Key Performance Indicators #}
+{% if not selected_partner and not selected_manager and not sl_cards %}
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
@@ -691,8 +1449,13 @@
         </div>
     </div>
 </div>
+{% endif %}
+
+{% comment %} Rankings moved to just after KPIs for layout. Original block removed. {% endcomment %}
 
 <!-- Revenue Visualizations removed per request -->
+ 
+{# Close Service Line conditional wrapper if it was opened earlier #}
 
 {% endblock %}
 
@@ -728,67 +1491,114 @@
 
     // Exchange Rate Chart (Plotly)
     if (document.getElementById('exchangeRateChart')) {
-    const exchangeDates = JSON.parse('{{ exchange_dates|default:'[]'|escapejs }}');
-    const oficialRatesHistory = JSON.parse('{{ oficial_rates_history|default:'[]'|escapejs }}');
-    const paraleloRatesHistory = JSON.parse('{{ paralelo_rates_history|default:'[]'|escapejs }}');
-    const differentialHistory = JSON.parse('{{ differential_history|default:'[]'|escapejs }}');
+        const exchangeDates = JSON.parse('{{ exchange_dates|default:"[]"|escapejs }}');
+        const oficialRatesHistory = JSON.parse('{{ oficial_rates_history|default:"[]"|escapejs }}');
+        const paraleloRatesHistory = JSON.parse('{{ paralelo_rates_history|default:"[]"|escapejs }}');
+        const differentialHistory = JSON.parse('{{ differential_history|default:"[]"|escapejs }}');
 
+        // Blue line for Tasa Oficial
         const traceOficial = {
             x: exchangeDates,
             y: oficialRatesHistory,
             mode: 'lines',
-            name: 'Oficial Rate',
-            line: {color: 'var(--ey-white)'} // Use EY white
+            name: 'Tasa Oficial (USD/VES)',
+            line: {color: '#007BFF', width: 3}, // Blue line
+            yaxis: 'y'
         };
 
+        // Red line for Tasa Paralelo  
         const traceParalelo = {
             x: exchangeDates,
             y: paraleloRatesHistory,
             mode: 'lines',
-            name: 'Paralelo Rate',
-            line: {color: 'var(--ey-white)'} // Use EY white
+            name: 'Tasa Binance (USD/VES)',
+            line: {color: '#DC3545', width: 3}, // Red line
+            yaxis: 'y'
         };
 
+        // Yellow bars for differential percentage
         const traceDifferential = {
             x: exchangeDates,
             y: differentialHistory,
-            mode: 'lines',
-            name: 'Differential',
-            line: {color: 'var(--ey-green)', dash: 'dot'} // Use EY green, dotted line
+            type: 'bar',
+            name: 'Differential (%)',
+            marker: {color: '#FFD700', opacity: 0.7}, // Yellow bars with transparency
+            yaxis: 'y2'
         };
 
         const layout = {
-            title: 'Historical Exchange Rates and Differential',
-            plot_bgcolor: 'var(--ey-dark-grey)', // Card background
-            paper_bgcolor: 'var(--ey-dark-grey)', // Card background
+            title: {
+                text: 'Exchange Rate Differential Trends',
+                font: {color: '#333333', size: 16}
+            },
+            plot_bgcolor: '#F5F5F5', // Light grey background
+            paper_bgcolor: '#FFFFFF', // White paper background
             font: {
-                color: 'var(--ey-white)' // Text color
+                color: '#333333' // Dark text color for readability
             },
             xaxis: {
                 title: 'Date',
-                tickfont: { color: 'var(--ey-white)' },
-                gridcolor: 'var(--ey-medium-grey)'
+                tickfont: { color: '#333333' },
+                gridcolor: '#E0E0E0',
+                showgrid: true
             },
             yaxis: {
-                title: 'Rate (VES)',
-                tickfont: { color: 'var(--ey-white)' },
-                gridcolor: 'var(--ey-medium-grey)'
+                title: 'Exchange Rate (VES)',
+                titlefont: {color: '#333333'},
+                tickfont: { color: '#333333' },
+                gridcolor: '#E0E0E0',
+                showgrid: true,
+                side: 'left'
+            },
+            yaxis2: {
+                title: 'Differential (%)',
+                titlefont: {color: '#FFD700'},
+                tickfont: { color: '#FFD700' },
+                overlaying: 'y',
+                side: 'right',
+                showgrid: false
             },
             legend: {
-                font: { color: 'var(--ey-white)' }
+                font: { color: '#333333' },
+                bgcolor: 'rgba(255,255,255,0.8)',
+                bordercolor: '#E0E0E0',
+                borderwidth: 1
+            },
+            margin: {
+                l: 60,
+                r: 60,
+                t: 50,
+                b: 50
             }
         };
 
-        Plotly.newPlot('exchangeRateChart', [traceOficial, traceParalelo, traceDifferential], layout);
+        Plotly.newPlot('exchangeRateChart', [traceOficial, traceParalelo, traceDifferential], layout, {responsive: true});
     }
 
     // Revenue charts removed per request
 
     // Add JS to make macro cards clickable (but not the preview button)
     document.addEventListener('DOMContentLoaded', function() {
+    // Capture clicks on .cobranzas-preview anchors at the document level (capture phase)
+    // This ensures the cobranzas preview opens even if other handlers would navigate elsewhere.
+    document.addEventListener('click', function(e) {
+        try {
+            const a = e.target.closest('.cobranzas-preview');
+            if (a) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                window.open("{% url 'cobranzas:preview' %}", '_blank');
+                return;
+            }
+        } catch (err) {
+            // ignore
+        }
+    }, true);
+
     document.querySelectorAll('.macro-card').forEach(card => {
         const reportDate = card.getAttribute('data-report-date');
         if (!reportDate) return; // nothing to link to
+        // route card clicks to the data downloads preview for the report date
         const previewUrl = `{% url 'data_downloads' %}?report_date=` + encodeURIComponent(reportDate);
         // Click on the card body (not the preview button) navigates to preview
         card.addEventListener('click', (e) => {
@@ -796,6 +1606,62 @@
             window.location.href = previewUrl;
         });
     });
+    
+    // Auto-refresh exchange rates when new data is available
+    checkForExchangeRateUpdates();
+    // Fallback: explicitly bind the Cobranzas preview button to open the cobranzas preview in a new tab
+    try {
+        const fallbackBtns = document.querySelectorAll('.cobranzas-preview');
+        console.log('Binding cobranzas-preview fallback for', fallbackBtns.length, 'buttons');
+        fallbackBtns.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open("{% url 'cobranzas:preview' %}", '_blank');
+            });
+        });
+    } catch (err) {
+        console.error('Error binding cobranzas preview fallback:', err);
+    }
 });
+
+// Function to check for exchange rate updates
+function checkForExchangeRateUpdates() {
+    const currentDate = '{{ latest_exchange_date }}';
+    
+    // Check every 5 minutes for new data
+    setInterval(function() {
+        // Use the current page URL to ensure we're using the correct port
+        fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newExchangeInfo = doc.querySelector('.exchange-rate-info');
+                const currentExchangeInfo = document.querySelector('.exchange-rate-info');
+                
+                if (newExchangeInfo && currentExchangeInfo) {
+                    const newContent = newExchangeInfo.innerHTML;
+                    const currentContent = currentExchangeInfo.innerHTML;
+                    
+                    // If content has changed, update it and show notification
+                    if (newContent !== currentContent) {
+                        currentExchangeInfo.innerHTML = newContent;
+                        
+                        // Add visual indicator for updated data
+                        currentExchangeInfo.style.animation = 'pulse 2s';
+                        setTimeout(() => {
+                            currentExchangeInfo.style.animation = '';
+                        }, 2000);
+                        
+                        console.log('Exchange rates updated with new data');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking for exchange rate updates:', error);
+            });
+    }, 300000); // Check every 5 minutes (300000 ms)
+}
 </script>
 {% endblock %}

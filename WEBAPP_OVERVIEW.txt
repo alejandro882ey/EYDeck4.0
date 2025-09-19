@@ -1,0 +1,107 @@
+Elevator Pitch
+
+EY Venezuela Revenue Dashboard — a powerful, Django-based analytics platform that transforms raw financial and exchange-rate data into reliable, auditable, and actionable business intelligence for revenue teams. It ingests multiple data sources, applies rigorous validation and fiscal logic, and delivers fast visual insights, automated reports, and exportable datasets — all centered on accuracy, reproducibility, and minimal friction for analysts and finance owners.
+
+Overview
+
+This web application is a sophisticated Django project focused on revenue tracking, exchange rate differential analysis, and advanced financial analytics for EY Venezuela. It centralizes data ingestion, processing, and visualization to help finance teams monitor revenue, collections, and exchange-rate impacts across clients, contracts, and business areas.
+
+Core Components
+
+- Django Project (dashboard_django/)
+  - settings.py: Central config for database, installed apps, and middleware. Note: project expects Django development server to run on port 8001.
+  - urls.py: Main URL dispatcher.
+  - wsgi.py/asgi.py: Deployment entry points.
+
+- Core App (core_dashboard/)
+  - models.py: Central domain models (RevenueEntry, ExchangeRate, Client/Contract hierarchies).
+  - views.py: High-level views orchestrating analytics, uploads, tables, and reporting (contains complex business logic that should be refactored into modules/services over time).
+  - modules/: Feature modules that encapsulate domain services (exchange rates, collections, MTD logic, ranking, cobranzas, etc.). Each module follows a consistent structure (models, views, services, utils, tests, templates).
+  - utils.py / data_processor.py: Shared utilities and pipeline orchestration helpers.
+  - management/commands/: Reusable management commands for import, validation and scheduled tasks (e.g., exchange-rate collection, revenue import, differential validation).
+
+- External Analytics Engine (ey_analytics_engine.py)
+  - Time-series analysis (ARIMA, VAR), signal processing, forecasting, and wrappers for external data sources (pyDolarVenezuela, Alpha Vantage, BVC scraping).
+  - Plotly-driven visualization generators used in views.
+
+- Root-level Scripts
+  - Numerous helper scripts for offline processing, fixing/detecting data issues, and one-off analyses (e.g., process_manager_metas.py, analyze_difference.py, fix_diferencial_*.py).
+
+Data Flow & Capabilities
+
+- Ingestion
+  - Multi-file upload system supports revenue, engagement, and differential datasets.
+  - Excel (openpyxl) and CSV parsing with thorough validation and normalization.
+  - Management commands for scheduled or bulk imports.
+
+- Processing
+  - Pandas-centric ETL for cleaning, fiscal period mapping, MTD/YTD aggregation, and exchange rate normalization.
+  - Modular services implement business rules: cobranzas (collections caching/invalidation), mtd_module (fiscal rollups), exchange_rate_module (historical processing and differentials), ranking_module (KPIs and leaderboards).
+
+- Analytics & Reporting
+  - Dashboard view with interactive charts, macro cards (collected YTD, MTD deltas), and detailed tables with filtering and export.
+  - Advanced statistical tools (forecasting, smoothing, and anomaly detection) via statsmodels, scikit-learn, and arch.
+  - Exportable datasets and downloadable visuals for stakeholders.
+
+- Operational Features
+  - Persistent cache for heavy I/O aggregations (e.g., cobranzas) with atomic writes and safe invalidation on uploads.
+  - Clear separation between processing scripts and web-accessible services; long-running tasks are executed outside request-response cycles where possible.
+
+Design Philosophy
+
+- Improve and Adjust, Never change the integrity of the code. Changes should be additive, preserve behavior, and be reversible via Git.
+- Fat models / thin views: Business logic belongs in models or services, not in views.
+- Modular growth: New features should live under `core_dashboard/modules/` and follow the project's module pattern.
+- Preserve compatibility: `ey_analytics_engine.py` and module APIs must remain stable to avoid breaking dependent views and scripts.
+- Auditable transformations: All data fixes and ETL steps aim to be transparent and reproducible. Scripts and management commands serve as an execution log for data changes.
+
+Tools, Libraries & Integrations
+
+- Django (web framework)
+- pandas, numpy (data processing)
+- statsmodels, arch, scikit-learn (analytics & forecasting)
+- plotly (interactive visualizations)
+- openpyxl (Excel processing)
+- requests, beautifulsoup4 (web scraping for indices)
+- pyDolarVenezuela (country-specific FX data)
+- fredapi (macroeconomic indicators)
+
+Key Parameters and Configurations
+
+- Server Port: The dev server must run on port 8001 (hard requirement in project context and launch scripts).
+- Database: SQLite by default (db.sqlite3). Migrations must be applied carefully for schema changes.
+- Cache locations: MEDIA_ROOT/cobranzas/ for persistent caches. Cache invalidation performed on upload and clear operations.
+- File formats: Expected Excel templates (e.g., Historial_TCBinance.xlsx) must follow the project's expected column layouts or the importer will reject them.
+
+Potential & Roadmap Ideas
+
+- Convert heavy root-level scripts into management commands or module services for better integration and scheduling.
+- Add Celery + Redis for background processing of uploads and heavy aggregations to keep request latency low.
+- Introduce typed pydantic schemas or Django Rest Framework serializers for clearer data contracts and safer imports.
+- Centralize caching using Redis and move away from file-based cache for scalability.
+- Add more unit and integration tests (CI) to increase confidence when changing fiscal rules or exchange-rate logic.
+- Create a lightweight API layer to allow other internal systems to consume aggregated KPIs.
+
+Testing & Quality Gates
+
+- Prefer test-driven changes: add unit tests for services and modules; include edge-case tests for fiscal boundaries and missing exchange-rate days.
+- Run linting and static type checks locally (black/isort/flake8/mypy) before committing.
+- Smoke test: run `python manage.py runserver 8001` and visit `http://127.0.0.1:8001` to verify the project starts. Run key management commands manually to confirm data imports.
+
+Security & Operational Notes
+
+- Avoid embedding secrets in code. Use environment variables for API keys and credentials.
+- Be cautious when running web-scrapers or external API calls in-request; use background tasks or rate limiting.
+- Back up the database before running destructive scripts or migrations.
+
+Files & Where Things Live (quick map)
+
+- Project root: management scripts, `manage.py`, `requirements.txt`, `db.sqlite3`, and the overview file you just created.
+- `core_dashboard/`: main app, modules, views, models, management commands.
+- `core_dashboard/modules/`: modular feature implementations (exchange_rate_module, cobranzas, mtd_module, ranking_module, etc.).
+- `templates/core_dashboard/`: base templates and feature pages (dashboard, upload, analysis, tables).
+- `ey_analytics_engine.py`: analytics engine used across views.
+
+Closing Summary
+
+This application brings together financial domain modeling, robust data ingestion, and advanced analytics into a single Django-based platform tailored to EY Venezuela's revenue and exchange-rate needs. It prioritizes auditability, predictable behavior, and extensibility — enabling analysts to trust the numbers, reproduce transformations, and iterate on business rules with confidence.

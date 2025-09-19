@@ -101,6 +101,7 @@ class Command(BaseCommand):
                     dif_div=get_float_or_none(row.get('Dif_Div')),
                     perdida_tipo_cambio_monitor=get_float_or_none(row.get('Perdida al tipo de cambio Monitor')),
                     fytd_diferencial_final=get_float_or_none(row.get('FYTD_diferencial_final')),
+                    diferencial_mtd=get_float_or_none(row.get('diferencial_mtd')),
                     fytd_ansr_sintetico=get_float_or_none(row.get('FYTD_ANSR_Sintetico')),
                 )
         self.stdout.write(self.style.SUCCESS('Successfully imported data from Final_Database.csv'))

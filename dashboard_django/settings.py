@@ -131,3 +131,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CRITICAL: Default development server port - MUST BE 8001
+# This matches the port used in launch_dashboard.py and MUST NOT be changed
+DEVELOPMENT_SERVER_PORT = 8001

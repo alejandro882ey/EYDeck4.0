@@ -1,0 +1,331 @@
+{% extends "core_dashboard/base.html" %}
+{% load humanize %}
+{% load format_filters %}
+
+{% block extra_css %}
+<style>
+/* Cobranzas Preview UI parameter variables (see docs/COBRANZAS_UI_PARAMETERS.md) */
+:root {
+    --cobranzas-card-title: 13px;
+    --cobranzas-card-number: 32px;
+    --cobranzas-card-padding: 16px;
+    --cobranzas-chart-height: 360px;
+    --cobranzas-legend-size: 12px;
+}
+
+.cobranzas-card-header { font-size: var(--cobranzas-card-title); font-weight:600; }
+.cobranzas-card-number { font-size: var(--cobranzas-card-number); }
+.small-number { font-size: 12px; }
+
+/* Scoped override to ensure the cobranzas preview fills the main-panel and avoids a right-side black gap */
+.preview-centered {
+    /* use full available width of .main-panel to avoid extra right-side gap */
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* Stronger guards: prevent horizontal overflow originating from this preview page */
+html, body, .main-panel {
+    overflow-x: hidden !important;
+}
+
+/* Ensure the main-panel stretches to the right edge of the viewport (compensate for fixed sidebar) */
+.wrapper, .main-panel {
+    width: auto !important;
+    min-width: 0 !important;
+    right: 0 !important;
+}
+.main-panel {
+    /* keep the left offset for the sidebar but let the right side reach the viewport edge */
+    margin-left: 260px !important;
+    left: 260px !important;
+    position: relative !important;
+}
+
+/* Ensure bootstrap container doesn't apply a smaller max-width that could visually center content leaving background visible */
+.preview-centered.container {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+@media (max-width: 991.98px) {
+    /* On small screens allow full width (stacking under sidebar) */
+    .preview-centered { width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+}
+
+@media (min-width: 1600px) {
+    .preview-centered { width: 100% !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 preview-centered">
+    <div class="row justify-content-center">
+    <div class="col-12">
+            <div class="card">
+                <div class="card-header">Cobranzas — Analysis</div>
+                <div class="card-body">
+        {% if message %}
+            <div class="alert alert-warning">{{ message }}</div>
+        {% else %}
+            <h3>Total Collected (cumulative): <strong>$<span id="collected_total_card">{{ collected_total|format_number }}</span></strong></h3>
+            <p class="small-number">%USD - VES: {{ usd_pct|format_number }}% / {{ ves_pct|format_number }}%</p>
+            <hr />
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card bg-dark text-white mb-2">
+                        <div class="card-header">Cobranzas USD</div>
+                        <div class="card-body">
+                            <h4 class="cobranzas-card-number">$<span id="usd_total_card">{{ usd_total|format_number }}</span></h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-dark text-white mb-2">
+                        <div class="card-header">Cobranzas VES (equivalente a USD)</div>
+                        <div class="card-body">
+                            <h4 class="cobranzas-card-number">$<span id="ves_equiv_total_card">{{ ves_equiv_total|format_number }}</span></h4>
+                            <p class="small-number mt-1"><span id="ves_bolivares_card">{{ ves_bolivares_total|format_number }}</span> VES</p>
+                            <!-- per-file snapshot removed to keep cards authoritative from service totals -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- MTD cards -->
+            <div class="row mt-2">
+                <div class="col-md-6">
+                    <div class="card border-warning mb-2">
+                        <div class="card-header">Cobranzas USD MTD</div>
+                        <div class="card-body">
+                            <h5 class="cobranzas-card-number">$<span id="usd_mtd_card">{{ usd_mtd|format_number }}</span></h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-warning mb-2">
+                        <div class="card-header">Cobranzas VES MTD (equivalente a USD)</div>
+                        <div class="card-body">
+                            <h5 class="cobranzas-card-number">$<span id="ves_mtd_card">{{ ves_equiv_mtd|format_number }}</span></h5>
+                            <p class="small-number mt-1"><span id="ves_bolivares_mtd_card">{{ ves_bolivares_mtd|format_number }}</span> VES</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr />
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <p>Processed file: <strong>{{ file_info.filename }}</strong> — last modified: {{ file_info.modified|date:"Y-m-d H:i:s" }}</p>
+                </div>
+                <div class="form-inline">
+                    <label for="report_date_select" class="me-2">Show data up to:</label>
+                    <select id="report_date_select" class="form-select form-select-sm">
+                        <option value="">All dates</option>
+                        {% for r in available_reports %}
+                        <option value="{{ r.date }}" {% if r.date == selected_report_date %}selected{% endif %}>{{ r.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div id="cumulative_up_to_text" class="mt-2">
+                {% if cumulative_up_to %}
+                    Cumulative collected up to <strong>{{ selected_report_date }}</strong>: <strong>${{ cumulative_up_to|format_number }}</strong>
+                {% endif %}
+            </div>
+            <!-- Charts: daily collections and exchange rates -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card mb-2">
+                        <div class="card-header">Daily Collections (USD vs VES equivalent USD)</div>
+                        <div class="card-body">
+                            <div id="cobranzas-daily-bar" style="width:100%;height:var(--cobranzas-chart-height,360px);"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card mb-2">
+                        <div class="card-header">Exchange Rate Daily Evolution (Tasa Oficial, Tasa Binance, Tasa Sintetica)</div>
+                        <div class="card-body">
+                            <div id="cobranzas-exchange-line" style="width:100%;height:var(--cobranzas-chart-height,360px);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- debug panel removed to simplify preview; use server logs or explicit debug endpoint when needed -->
+        {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    (function(){
+    // flexible number formatter: default 0 decimals for Cobranzas preview (integers with thousands separators)
+    function formatCurrency(n, decimals=0){
+        try{
+            decimals = Number.isInteger(decimals) ? decimals : 0;
+            return Number(n).toLocaleString(undefined, {minimumFractionDigits:decimals, maximumFractionDigits:decimals});
+        }catch(e){
+            return Number(n).toFixed(decimals);
+        }
+    }
+    const series = JSON.parse('{{ cobranzas_series_json|default:"{}"|escapejs }}');
+    if (!series || !series.dates) return;
+
+    // keep master copies
+    const masterDates = series.dates.slice();
+    const masterUsd = (series.daily_usd || []).slice();
+    const masterVes = (series.daily_ves_equiv_usd || []).slice();
+    const masterTOf = (series.tasa_oficial || []).slice();
+    const masterTBa = (series.tasa_binance || []).slice();
+    const masterTSi = (series.tasa_sintetica || []).slice();
+
+    function renderCharts(dates, usd, ves, tOf, tBa, tSi) {
+        const traceUsd = { x: dates, y: usd, name: 'USD', marker:{color:'#1f77b4'}, type: 'bar' };
+        const traceVes = { x: dates, y: ves, name: 'VES equiv (USD)', marker:{color:'#d62728'}, type: 'bar' };
+        const layoutBar = {
+            barmode: 'stack',
+            margin:{t:30,l:60,r:20,b:80},
+            xaxis:{tickangle: -45},
+            yaxis:{tickformat:',.0f'} // integer ticks, thousands separator
+        };
+        Plotly.newPlot('cobranzas-daily-bar', [traceUsd, traceVes], layoutBar, {responsive:true});
+
+        const tOfTrace = { x: dates, y: tOf, name: 'Tasa Oficial', mode: 'lines+markers', line:{color:'#1f77b4'} };
+        const tBaTrace = { x: dates, y: tBa, name: 'Tasa Binance', mode: 'lines+markers', line:{color:'#d62728'} };
+        const tSiTrace = { x: dates, y: tSi, name: 'Tasa Sintetica', mode: 'lines+markers', line:{color:'#ffcc00'} };
+        const layoutLine = {
+            margin:{t:30,l:60,r:20,b:80},
+            xaxis:{tickangle:-45},
+            yaxis:{tickformat:'.2f'} // show two decimals for rates
+        };
+        Plotly.newPlot('cobranzas-exchange-line', [tOfTrace, tBaTrace, tSiTrace], layoutLine, {responsive:true});
+    }
+
+    // initial render with full series
+    renderCharts(masterDates, masterUsd, masterVes, masterTOf, masterTBa, masterTSi);
+
+    // handle dropdown filter: keep dates <= selected_date
+    const select = document.getElementById('report_date_select');
+    if (select) {
+        select.addEventListener('change', function(e) {
+            const val = e.target.value;
+            if (!val) {
+                // show all dates and restore cards to global totals
+                renderCharts(masterDates, masterUsd, masterVes, masterTOf, masterTBa, masterTSi);
+                // restore totals displayed from template-provided values
+                try {
+                    document.getElementById('usd_total_card').textContent = '{{ usd_total|format_number }}';
+                    document.getElementById('ves_equiv_total_card').textContent = '{{ ves_equiv_total|format_number }}';
+                    document.getElementById('usd_mtd_card').textContent = '{{ usd_mtd|format_number }}';
+                    document.getElementById('ves_mtd_card').textContent = '{{ ves_equiv_mtd|format_number }}';
+                    const cumEl = document.getElementById('cumulative_up_to_text');
+                    if (cumEl) cumEl.innerHTML = '';
+                } catch (err) {
+                    // ignore DOM errors
+                }
+                return;
+            }
+
+            // slice charts client-side as before
+            const cutoff = val;
+            let idx = -1;
+            for (let i=0;i<masterDates.length;i++){
+                if (masterDates[i] <= cutoff) idx = i;
+            }
+            if (idx < 0) {
+                renderCharts([], [], [], [], [], []);
+            } else {
+                const d = masterDates.slice(0, idx+1);
+                const u = masterUsd.slice(0, idx+1);
+                const v = masterVes.slice(0, idx+1);
+                const of = masterTOf.slice(0, idx+1);
+                const ba = masterTBa.slice(0, idx+1);
+                const si = masterTSi.slice(0, idx+1);
+                renderCharts(d, u, v, of, ba, si);
+            }
+
+            // Call server for authoritative card totals and MTD values
+            fetch(`{% url 'cobranzas:preview_data' %}?report_date=${encodeURIComponent(val)}`)
+                .then(r => r.json())
+                .then(data => {
+                        if (!data || !data.success) return;
+                    try {
+                        // Update card numbers using authoritative server totals
+                        const usdCard = document.getElementById('usd_total_card');
+                        const vesCard = document.getElementById('ves_equiv_total_card');
+                        const usdMtdCard = document.getElementById('usd_mtd_card');
+                        const vesMtdCard = document.getElementById('ves_mtd_card');
+
+                        if (usdCard) usdCard.textContent = formatCurrency(Number(data.usd_total || 0), 0);
+                        if (vesCard) vesCard.textContent = formatCurrency(Number(data.ves_equiv_total || 0), 0);
+
+                        // MTD values: use server-provided usd_mtd/ves_equiv_mtd
+                        if (usdMtdCard) usdMtdCard.textContent = formatCurrency(Number(data.usd_mtd || 0), 0);
+                        if (vesMtdCard) vesMtdCard.textContent = formatCurrency(Number(data.ves_equiv_mtd || 0), 0);
+
+                        // Update the top Total Collected (cumulative) headline to reflect the selected cutoff
+                        try{
+                            const topCollectedEl = document.getElementById('collected_total_card');
+                            if (topCollectedEl){
+                                if (data.cumulative_usd_up_to !== undefined && data.cumulative_ves_equiv_up_to !== undefined){
+                                    const total = Number((data.cumulative_usd_up_to||0) + (data.cumulative_ves_equiv_up_to||0));
+                                    topCollectedEl.textContent = formatCurrency(total, 0);
+                                } else if (data.cumulative_up_to !== undefined){
+                                    topCollectedEl.textContent = formatCurrency(Number(data.cumulative_up_to || 0));
+                                } else if (data.file_collected !== null && data.file_collected !== undefined){
+                                    topCollectedEl.textContent = formatCurrency(Number(data.file_collected || 0));
+                                }
+                            }
+                        }catch(err){}
+
+                        const cumEl = document.getElementById('cumulative_up_to_text');
+                        if (cumEl) {
+                            // prefer precise breakdown if available
+                            if (data.cumulative_usd_up_to !== undefined && data.cumulative_ves_equiv_up_to !== undefined) {
+                                const total = Number((data.cumulative_usd_up_to||0) + (data.cumulative_ves_equiv_up_to||0));
+                                cumEl.innerHTML = `Cumulative collected up to <strong>${data.report_date}</strong>: <strong>$${formatCurrency(total, 0)}</strong>`;
+                                // update headline percent
+                                try {
+                                    const usdPctEl = document.querySelector('.small-number');
+                                    if (usdPctEl) {
+                                        const usd = Number(data.cumulative_usd_up_to||0);
+                                        const ve = Number(data.cumulative_ves_equiv_up_to||0);
+                                        const totalSplit = usd + ve;
+                                        let usdPct = 0, vesPct = 0;
+                                        if (totalSplit>0) { usdPct = Math.round((usd/totalSplit)*100); vesPct = Math.round((ve/totalSplit)*100); }
+                                        usdPctEl.textContent = `%USD - VES: ${usdPct}% / ${vesPct}%`;
+                                    }
+                                } catch (err){}
+                            } else {
+                                cumEl.innerHTML = `Cumulative collected up to <strong>${data.report_date}</strong>: <strong>$${formatCurrency(Number(data.cumulative_up_to||0), 0)}</strong>`;
+                            }
+                        }
+                    } catch (err) {
+                        // ignore DOM update errors
+                    }
+                })
+                .catch(err => console.error('Error fetching preview data:', err));
+        });
+    }
+
+    // If the page was opened with a selected_report_date from the server, trigger the AJAX
+    (function triggerInitialSelected(){
+        const sel = '{{ selected_report_date|default:"" }}';
+        if (sel && document.getElementById('report_date_select')){
+            // set dropdown value and trigger change to update both charts and cards
+            const selEl = document.getElementById('report_date_select');
+            selEl.value = sel;
+            const event = new Event('change');
+            selEl.dispatchEvent(event);
+        }
+    })();
+    })();
+</script>
+{% endblock %}
+{% endblock %}

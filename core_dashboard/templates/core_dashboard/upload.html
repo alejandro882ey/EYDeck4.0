@@ -51,10 +51,27 @@
                             <label for="revenue_days_file" class="form-label">Revenue Days File (.csv, .xls, .xlsx, .xlsb)</label>
                             <input class="form-control" type="file" id="revenue_days_file" name="revenue_days_file" required>
                         </div>
+                        <div class="mb-3">
+                            <label for="manager_revenue_days_file" class="form-label">Manager Revenue Days File (.xlsx, .xls) - Optional</label>
+                            <input class="form-control" type="file" id="manager_revenue_days_file" name="manager_revenue_days_file" accept=".xlsx,.xls">
+                            <div class="form-text">Optional: Upload Manager Revenue Days report for the same week. Will extract RevenueDays sheet separately.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="cobranzas_file" class="form-label">Cobranzas File (.xlsx, .xls) - Optional</label>
+                            <input class="form-control" type="file" id="cobranzas_file" name="cobranzas_file" accept=".xlsx,.xls">
+                            <div class="form-text">Optional: Upload weekly Cobranzas report. The sheet "Cobranzas + Ant Semana Actual" will be extracted.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="facturacion_file" class="form-label">Facturacion File (.xlsx, .xls) - Optional</label>
+                            <input class="form-control" type="file" id="facturacion_file" name="facturacion_file" accept=".xlsx,.xls">
+                            <div class="form-text">Optional: Upload weekly Facturacion report (cumulative FYTD). The sheet should include columns like 'Net Amount Local', 'Accounting Cycle Date', 'Fiscal Year', and 'Engagement Country/Region'.</div>
+                        </div>
                         <button type="submit" class="btn btn-primary">Upload</button>
                     </form>
                 </div>
             </div>
+
+
 
             <div class="card mt-5">
                 <div class="card-header">
@@ -81,7 +98,354 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Delete Data and Cache Button -->
+            <div class="text-center mt-4 mb-5">
+                <button type="button" class="btn btn-danger btn-delete-data" onclick="deleteDataAndCache()" 
+                        style="background-color: #dc3545; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 5px;">
+                    Delete Data and Cache
+                </button>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Password Modal -->
+<div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="passwordModalLabel">Delete Data and Cache</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <strong>Warning:</strong> This action will permanently delete all uploaded data, cache files, and database entries. This cannot be undone.
+                </div>
+                <div class="mb-3">
+                    <label for="deletePassword" class="form-label">Enter password to confirm:</label>
+                    <input type="password" class="form-control" id="deletePassword" placeholder="Enter password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Delete Everything</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteDataAndCache() {
+    // Show the password modal
+    var modal = new bootstrap.Modal(document.getElementById('passwordModal'));
+    modal.show();
+}
+
+function confirmDelete() {
+    const password = document.getElementById('deletePassword').value;
+    
+    if (!password) {
+        alert('Please enter a password.');
+        return;
+    }
+    
+    // Show loading state
+    const deleteButton = document.querySelector('.modal-footer .btn-danger');
+    const originalText = deleteButton.textContent;
+    deleteButton.textContent = 'Deleting...';
+    deleteButton.disabled = true;
+    
+    // Send AJAX request
+    fetch('/delete-data-cache/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: 'password=' + encodeURIComponent(password)
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+            alert('Success: ' + data.message);
+            // Close modal and reload page
+            bootstrap.Modal.getInstance(document.getElementById('passwordModal')).hide();
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error details:', error);
+        alert('An error occurred while deleting data. Check the console for details.');
+    })
+    .finally(() => {
+        // Reset button state
+        deleteButton.textContent = originalText;
+        deleteButton.disabled = false;
+        document.getElementById('deletePassword').value = '';
+    });
+}
+
+// Manager Revenue Days Functions
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Manager Revenue Days form handler
+    const form = document.getElementById('manager-revenue-days-form');
+    if (form) {
+        form.addEventListener('submit', uploadManagerRevenueDays);
+    }
+    
+    // Load status on page load
+    getManagerRevenueDaysStatus();
+    // Load cobranzas status
+    getCobranzasStatus();
+    // Load facturacion status
+    getFacturacionStatus();
+});
+
+function uploadManagerRevenueDays(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const fileInput = document.getElementById('manager_revenue_days_file');
+    const submitBtn = document.getElementById('upload-manager-revenue-days-btn');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    const alertsDiv = document.getElementById('manager-revenue-days-alerts');
+    
+    // Validate file selection
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showManagerRevenueDaysAlert('Please select a Manager Revenue Days file.', 'danger');
+        return;
+    }
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    spinner.classList.remove('d-none');
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
+    
+    // Clear previous alerts
+    alertsDiv.innerHTML = '';
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('manager_revenue_days_file', fileInput.files[0]);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    // Send upload request
+    fetch('/manager-revenue-days/upload/', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showManagerRevenueDaysAlert(
+                `Success: ${data.message}<br>
+                <strong>File Info:</strong><br>
+                - Original: ${data.file_info.original_name}<br>
+                - Size: ${data.file_info.size}<br>
+                - Output: ${data.file_info.output_name}<br>
+                - Rows Processed: ${data.rows_processed}`, 
+                'success'
+            );
+            
+            // Reset form
+            form.reset();
+            
+            // Refresh status
+            setTimeout(getManagerRevenueDaysStatus, 1000);
+        } else {
+            showManagerRevenueDaysAlert(`Error: ${data.error}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Upload error:', error);
+        showManagerRevenueDaysAlert('An unexpected error occurred during upload.', 'danger');
+    })
+    .finally(() => {
+        // Reset button state
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+        submitBtn.innerHTML = 'Upload Manager Revenue Days';
+    });
+}
+
+// Cobranzas Functions
+function uploadCobranzas(event) {
+    event.preventDefault();
+    const fileInput = document.getElementById('cobranzas_file');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a Cobranzas file.');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('cobranzas_file', fileInput.files[0]);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('/cobranzas/upload/', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Success: ${data.message}\nRows processed: ${data.rows_processed}`);
+            fileInput.value = '';
+            setTimeout(getCobranzasStatus, 1000);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(e => { console.error(e); alert('Upload failed'); });
+}
+
+function getCobranzasStatus() {
+    fetch('/cobranzas/status/')
+    .then(r => r.json())
+    .then(data => {
+        console.log('Cobranzas status', data);
+        // Optionally show a UI element later
+    })
+    .catch(e => console.error('Cobranzas status error', e));
+}
+
+function clearCobranzas() {
+    if (!confirm('Clear Cobranzas files?')) return;
+    fetch('/cobranzas/clear/', { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value } })
+    .then(r => r.json())
+    .then(data => { alert(data.message || 'Cleared'); getCobranzasStatus(); })
+    .catch(e => console.error(e));
+}
+
+// Facturacion Functions
+function uploadFacturacion(event) {
+    event.preventDefault();
+    const fileInput = document.getElementById('facturacion_file');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a Facturacion file.');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('facturacion_file', fileInput.files[0]);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('/facturacion/upload/', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Success: ${data.message}\nRows processed: ${data.rows_processed}`);
+            fileInput.value = '';
+            setTimeout(getFacturacionStatus, 1000);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(e => { console.error(e); alert('Upload failed'); });
+}
+
+function getFacturacionStatus() {
+    fetch('/facturacion/status/')
+    .then(r => r.json())
+    .then(data => {
+        console.log('Facturacion status', data);
+        // Optionally show a UI element later
+    })
+    .catch(e => console.error('Facturacion status error', e));
+}
+
+function clearFacturacion() {
+    if (!confirm('Clear Facturacion files?')) return;
+    fetch('/facturacion/clear/', { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value } })
+    .then(r => r.json())
+    .then(data => { alert(data.message || 'Cleared'); getFacturacionStatus(); })
+    .catch(e => console.error(e));
+}
+
+function getManagerRevenueDaysStatus() {
+    fetch('/manager-revenue-days/status/')
+    .then(response => response.json())
+    .then(data => {
+        const statusDiv = document.getElementById('manager-revenue-days-status');
+        const contentDiv = document.getElementById('status-content');
+        
+        if (data.success && data.file_exists) {
+            contentDiv.innerHTML = `
+                <p><strong>File:</strong> ${data.file_info.filename}</p>
+                <p><strong>Size:</strong> ${data.file_info.size}</p>
+                <p><strong>Last Modified:</strong> ${data.file_info.last_modified}</p>
+                <span class="badge bg-success">File Available</span>
+            `;
+            statusDiv.style.display = 'block';
+        } else if (data.success && !data.file_exists) {
+            contentDiv.innerHTML = `
+                <p class="text-muted">${data.message}</p>
+                <span class="badge bg-secondary">No File</span>
+            `;
+            statusDiv.style.display = 'block';
+        } else {
+            console.error('Status check error:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Status check error:', error);
+    });
+}
+
+function clearManagerRevenueDays() {
+    if (!confirm('Are you sure you want to clear all Manager Revenue Days files? This action cannot be undone.')) {
+        return;
+    }
+    
+    const alertsDiv = document.getElementById('manager-revenue-days-alerts');
+    alertsDiv.innerHTML = '';
+    
+    fetch('/manager-revenue-days/clear/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showManagerRevenueDaysAlert(`Success: ${data.message}`, 'success');
+            // Refresh status
+            setTimeout(getManagerRevenueDaysStatus, 1000);
+        } else {
+            showManagerRevenueDaysAlert(`Error: ${data.error}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Clear error:', error);
+        showManagerRevenueDaysAlert('An unexpected error occurred while clearing files.', 'danger');
+    });
+}
+
+function showManagerRevenueDaysAlert(message, type) {
+    const alertsDiv = document.getElementById('manager-revenue-days-alerts');
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    alertsDiv.innerHTML = alertHtml;
+    
+    // Auto-dismiss success alerts after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            const alert = alertsDiv.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+}
+</script>
+
 {% endblock %}

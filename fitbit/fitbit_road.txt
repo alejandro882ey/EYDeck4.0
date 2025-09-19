@@ -1,0 +1,36 @@
+Fitbit Road - Guía del módulo
+
+Objetivo:
+Al subir nuevos datos, revisar para cada partner, manager y engagement las métricas ANSR y "horas cargadas" y compararlas contra las metas mensuales y anuales. Generar un análisis por IA que incluya una posible solución y enviar un mensaje por Microsoft Teams a cada partner con la información.
+
+Alcance inicial (MVP):
+- Scaffolding del módulo dentro del proyecto Django.
+- Lectura de metas desde archivos existentes: `metas_MANAGERS.csv`, `metas_PPED.csv`, `metas_SL.csv`.
+- Recolección de valores ANSR y horas cargadas desde la base de datos o archivos subidos.
+- Comparación contra metas anuales y mensuales.
+- Generación de un resumen por partner con diferencias y recomendaciones mediante un LLM (stub local que formatea prompt).
+- Envío de notificaciones por Teams usando webhooks configurables.
+
+Pasos detallados (orden de ejecución):
+1) Estructura: crear carpeta `fitbit` con módulos: `analyzer.py`, `teams_notifier.py`, `ai_helper.py`, `management_command.py`.
+2) Implementar lectura de metas y helpers para normalizar datos.
+3) Implementar función principal `run_fitbit_analysis(upload_source=None)` que:
+   - Identifica los partners/managers/engagements afectados por el upload
+   - Agrega ANSR y horas cargadas por entidad
+   - Llama a la comparación con metas
+   - Para cada partner, construye un prompt y llama a `ai_helper.generate_analysis`
+   - Envía notificación por Teams con el resultado
+4) Crear comando de Django `manage.py fitbit_run` para ejecutar el análisis manualmente (útil en pruebas y despliegue).
+5) Proporcionar variables de entorno y settings necesarias: `TEAMS_WEBHOOK_URL`, `OPENAI_API_KEY` (si se conecta a un LLM real), `FITBIT_DEBUG=true/false`.
+
+Notas técnicas:
+- El primer lanzamiento usará stubs para el LLM y para el envío a Teams (logging). Después se pueden reemplazar por integraciones reales.
+- Mantener tests unitarios para la lógica de comparación.
+
+Archivos a agregar inicialmente:
+- `analyzer.py` : lógica de lectura y comparación
+- `ai_helper.py` : interface para generar análisis con IA
+- `teams_notifier.py`: envía mensajes a Teams
+- `management_command.py`: comando Django
+
+Fin del roadmap inicial.

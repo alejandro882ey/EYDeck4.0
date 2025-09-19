@@ -1,0 +1,377 @@
+Cobranzas Module — Development Log
+
+Location:
+- core_dashboard/modules/cobranzas/
+
+Purpose:
+- New module to provide the Macro card "Cobranzas (Collected YTD)" for the dashboard.
+- Reads an uploaded Excel weekly report (sheet: "Cobranzas + Ant Semana Actual") and computes the collected amount as:
+  collected_total = SUM(Monto en Dólares de la Factura) + SUM(all Monto equivalente en USD de los VES Cobrados columns)
+- Keeps Facturacion (Billed YTD) at $0 until a separate Facturacion module is created (user request).
+- Decouples the Macro Cobranzas card from the legacy Final_Database-derived fields.
+
+Files added/modified (high level):
+- Added (new module files):
+  - __init__.py
+  - utils.py          -> extraction & header detection (openpyxl + pandas)
+  - services.py       -> CobranzasService: processing, normalization, numeric parsing, totals
+  - views.py          -> upload / status / clear endpoints (registered in urls.py)
+  - urls.py           -> routes for module endpoints
+- Supporting scripts (for debugging / validation):
+  - scripts/test_cobranzas_process.py
+  - scripts/call_extract.py
+  - scripts/inspect_original_cobranzas.py
+  - scripts/debug_cobranzas_values.py
+  - scripts/check_media_totals.py
+- Changes to existing project files (to complete the cutover):
+  - core_dashboard/views.py
+    - Dashboard now prefers CobranzasService totals for the Cobranzas card and sets billed total to 0.0 explicitly.
+  - process_uploaded_data.py
+    - Legacy fields fytd_collect_total_amt and fytd_total_billed_amt are no longer populated from Final_Database (set to None during import) to avoid legacy ties.
+
+Core implementation details
+
+1) Sheet extraction (utils.py)
+- Function: extract_cobranzas_sheet(uploaded_file_or_buffer)
+- Strategy:
+  - Uses pandas to quickly scan the sheet (header=None) to locate candidate header rows.
+  - Loads the target sheet using openpyxl with data_only=True to read cached evaluated values (not formulas).
+  - Heuristics for header detection:
+    - Look for a row that contains both a 'cliente' token and at least one money-related token ('monto', 'dólar', 'dolar', 'usd', 'ves').
+    - If not found, fall back to previously detected header row or first non-empty row.
+    - After selecting header row, build a pandas DataFrame from the subsequent rows using the detected header as columns.
+  - Deduplicates header names (append suffixes _1, _2) to avoid collisions.
+- Rationale:
+  - Many spreadsheets have preamble rows, merged cells, or formula columns. Reading evaluated values and using robust header detection ensures correct columns are captured.
+
+2) Processing + numeric parsing (services.py)
+- Class: CobranzasService
+  - media_folder = settings.MEDIA_ROOT / 'cobranzas' (created if missing)
+  - process_uploaded_file(uploaded_file, original_filename=None):
+    - Calls extract_cobranzas_sheet to obtain a normalized DataFrame of the columns of interest.
+    - Builds a normalized DataFrame with the specific integration columns (keeps original column names where possible):
+      - 'Cliente', 'Socio', 'Gerente', 'Engagement', 'Fecha de Cobro', 'Banco Receptor de los Fondos',
+        'Monto en Dólares de la Factura', 'Monto en Bolívares de la Factura', 'Monto equivalente en USD de los VES Cobrados'
+    - Saves the normalized dataframe to MEDIA as an xlsx (sheet name 'Cobranzas'), typically as 'Cobranzas_Latest.xlsx' unless original filename matches pattern.
+    - Computes totals by calling get_totals_from_file on the saved processed file (preferred) with a fallback to in-memory cell-by-cell parsing if reading back fails.
+    - Returns a dictionary including: success, output_path, rows_processed, collected_total (float), billed_total (float), and file info.
+  - get_latest_file_info(): returns the most recent processed xlsx/xls under media/cobranzas with metadata.
+  - get_totals_from_file(file_path): reads the processed Excel and sums relevant columns.
+    - Collection logic (explicit): sums columns whose normalized header matches any of: 'montodendolares', 'montoendolares', 'montousd', 'montoequivalente', 'montoenusd', or other money/ves variants.
+    - Billing logic (kept for compatibility): sums columns matching a billing pattern (totalfactura, montonetopagado, montofactura, montoenbolivares).
+
+- Numeric parsing heuristics:
+  - parse_numeric_value(v): robust function to handle
+    - numeric types directly
+    - currency symbols like '$', 'US$' and 'Bs.' removal
+    - localized separators: '1,234.56' and '1.234,56' handled via heuristics (detect both '.' and ',')
+    - fallback regex to extract numeric-like substring
+  - For in-memory summation, values are parsed cell-by-cell to avoid pandas coercion producing NaNs when formats vary.
+
+3) Dashboard integration (core_dashboard/views.py)
+- The dashboard checks for a processed Cobranzas file via CobranzasService.get_latest_file_info(); if present, it uses get_totals_from_file() to obtain the collected total.
+- Per the user requirement, Facturacion (Billed YTD) is explicitly set to 0.0 for now even if the processed file contains billed_total. This prevents showing billed values until a dedicated Facturacion module exists.
+
+4) Decoupling legacy processing
+- The process_uploaded_data.py mapping that previously populated RevenueEntry.fytd_collect_total_amt and fytd_total_billed_amt from Final_Database was modified to set those fields to None during import. This avoids having the old processed Final_Database CSV overwrite the new module's values.
+- The collection_module.py and other legacy helpers remain in the codebase for compatibility, but they no longer drive the Macro Cobranzas card.
+
+Testing & validation scripts
+- scripts/test_cobranzas_process.py
+  - Runs CobranzasService.process_uploaded_file against the sample report path using Django settings, and prints result.
+- scripts/call_extract.py
+  - Calls extract_cobranzas_sheet() directly on the original Excel file and prints returned DataFrame columns & head. Useful to verify header detection.
+- scripts/inspect_original_cobranzas.py
+  - Prints raw openpyxl values for the first 80 rows to inspect preamble, merged cells, formula-predicated rows.
+- scripts/debug_cobranzas_values.py and scripts/check_media_totals.py
+  - Small utilities to inspect the processed media file and compute totals via the service.
+
+Sample file used for development and test
+- Source report (user-provided):
+  C:\Users\CK624GF\OneDrive - EY\Documents\2025\Reports\cobranzas\FY26_11Jul_ Semana del 07 al 11 de Julio - IGTF 3%.xlsx
+- Processed (saved) file created during processing:
+  C:\Users\CK624GF\OneDrive - EY\Documents\2025\dashboard_django\media\cobranzas\Cobranzas_Latest.xlsx
+- Example computed totals observed during tests (final read-back):
+  - collected_total (combined): 540,184.3813945364
+    - This matches the user expectation of summing the USD invoice column plus the USD-equivalent VES column(s) (example: 53,255.60 + 486,928.78 = 540,184.38)
+  - billed_total (computed but ignored by dashboard): 61,915,219.82
+
+Assumptions & edge cases
+- The extractor expects the real header row to contain both 'Cliente' and at least one money-related token. If a file uses radically different header names, the mapping in services.py (mapping dict) should be updated to include more variants.
+- Works best when the Excel file stores evaluated cached values when cells contain formulas (openpyxl data_only=True). If the source file has cells that only contain formulas and lacks cached values, openpyxl may return None — ask the report author to "Save" or produce a copy with values.
+- Multiple columns named similarly ("Monto equivalente..." repeated for different exchange sources) are handled by deduplicating names and summing all candidates.
+- Numeric formats: the parser attempts to detect both comma and dot decimal/thousand separators but extreme/odd formats might fail; added fallback regex extraction.
+
+How to test end-to-end (quick)
+1) Upload via UI (Upload page) with the Cobranzas file attached. The backend will save and call CobranzasService. Alternatively use the debug script to re-run processing on the filesystem copy.
+2) Verify that `media/cobranzas/Cobranzas_Latest.xlsx` is created and has the normalized columns.
+3) Run `python scripts/check_media_totals.py` to print the collected total computed by the service.
+4) Open the dashboard page; the Macro card "Cobranzas (Collected YTD)" should display the collected_total (e.g., $540,184.38), and "Facturacion (Billed YTD)" should display $0.00.
+
+Next recommended steps (non-breaking, low-risk)
+- Add unit tests:
+  - extractor: verify header detection and returned DataFrame for a small set of sample files (happy path + some malformed headers).
+  - services.get_totals_from_file: test numeric parsing and sum heuristics.
+- Add a small integration smoke test that uploads the sample file through the upload endpoint and verifies the dashboard context picks up the computed totals.
+- Optionally change processed file naming scheme to include upload date (e.g., 'Cobranzas_YYYY-MM-DD.xlsx') so multiple runs are retained.
+- If you want billed totals to come from a future Facturacion module, prepare an interface in CobranzasService or a shared module so both modules can be used similarly by the dashboard.
+
+Rollback notes
+- The changes to `process_uploaded_data.py` are the critical cutover step. If you need to revert to the legacy behavior, revert the fytd_collect_total_amt / fytd_total_billed_amt population logic in that file and restore the previous dashboard preference.
+
+Contact points for a new AI or developer
+- Key entry points:
+  - `CobranzasService.process_uploaded_file(upload_file, original_filename=None)` — run this to process an uploaded workbook and produce the processed file and computed totals.
+  - `CobranzasService.get_latest_file_info()` — returns metadata about the most recent processed file.
+  - `CobranzasService.get_totals_from_file(path)` — returns (collected_total, billed_total) from any processed file.
+  - `extract_cobranzas_sheet(file)` — low-level extractor that returns a pandas DataFrame for the target sheet.
+- Helpful scripts for manual checks: `scripts/check_media_totals.py`, `scripts/test_cobranzas_process.py`, and `scripts/call_extract.py`.
+
+Status
+- Implementation complete for the Cobranzas module as requested.
+- Dashboard uses new module totals for Cobranzas; Facturacion intentionally left as $0 until a module is developed.
+- Processed file exists in media; scripts can re-run processing and report the totals.
+
+If you want me to include additional information in this log (for example, code snippets, exact method signatures, or a short README with commands to run the server and test), tell me and I will append it to this file or create a separate README_COBRANZAS.md.
+
+Detailed Backend and Frontend Processing (new)
+------------------------------------------------
+This section describes, in detail, how the back end and front end cooperate to ingest, process, store, and present Cobranzas data. It is intended for new developers, maintainers, or automated tooling that must interact with the module.
+
+High-level flow (end-to-end)
+- User uploads an Excel file via the dashboard Upload page (or an automated process uploads the file to the media folder).
+- The front end sends the file to the endpoint `/cobranzas/upload/` (POST) using a form or fetch()-based AJAX call. The endpoint is implemented in `core_dashboard/modules/cobranzas/views.py` and delegates heavy lifting to `CobranzasService.process_uploaded_file()` in `services.py`.
+- `CobranzasService.process_uploaded_file()` extracts the target sheet using `extract_cobranzas_sheet()` from `utils.py`, normalizes headers, parses numeric values, saves a cleaned/normalized workbook to `MEDIA_ROOT/cobranzas/`, and returns processing metadata and computed totals.
+- The front end polls `/cobranzas/status/` (GET) to retrieve processing status and latest file info; it may also call `/cobranzas/clear/` (POST) to clear stored media files.
+- The dashboard view (`core_dashboard/views.py`) reads the latest processed file via `CobranzasService.get_latest_file_info()` and `CobranzasService.get_totals_from_file()` to show the Macro card values; billed total is set to 0.0 until the Facturacion flow exists.
+
+Backend: detailed responsibilities and components
+
+1) Endpoints and views (`views.py`)
+- `upload_view(request)`: Accepts multipart file POSTs. Key behaviors:
+  - Validates file extension (.xlsx or .xls) and basic size limits (configured in settings or middleware).
+  - Calls `CobranzasService.process_uploaded_file(uploaded_file, original_filename=uploaded_file.name)` inside a try/except block.
+  - Returns JSON: { success: True/False, message, output_path, collected_total, billed_total, rows_processed }
+  - For long-running uploads the view may spawn background tasks (not currently implemented) or rely on the client polling the status endpoint.
+- `status_view(request)`: Returns metadata about the latest processed file and processing state:
+  - Returns JSON: { has_file: bool, file_info: { filename, modified, path }, collected_total, billed_total }
+- `clear_view(request)`: Deletes stored processed files in `MEDIA_ROOT/cobranzas/`. Ensures safety by only removing files inside the module media folder and returning a JSON confirmation.
+
+2) Service layer (`services.py`) — `CobranzasService`
+- Purpose: single place for business logic: extraction, normalization, numeric parsing, file saves, and totals computation. This keeps views thin and testable.
+- Key public methods:
+  - `process_uploaded_file(uploaded_file, original_filename=None)`
+    - Flow:
+      1. Create media folder `MEDIA_ROOT/cobranzas/` if missing.
+      2. Save incoming `uploaded_file` temporarily (Django `UploadedFile`), then pass its buffer/stream to `extract_cobranzas_sheet()`.
+      3. Receive a pandas DataFrame (normalized headers) from the extractor. Apply column mapping and normalization rules to guarantee the expected canonical columns exist.
+      4. Coerce and parse numeric columns using `parse_numeric_value(v)` for robustness (handles thousands separators, locale variations, currency symbols, and nulls).
+      5. Save the normalized DataFrame to an xlsx file in `MEDIA_ROOT/cobranzas/` (e.g., `Cobranzas_Latest.xlsx` or a timestamped filename). Use `pandas.ExcelWriter(..., engine='openpyxl')` to preserve consistent formatting.
+      6. Call `get_totals_from_file(saved_path)` to compute `collected_total` (preferred) as a read-back validation step. This helps ensure the saved file contains expected values.
+      7. Build and return a result dict including success, file path, totals, rows_processed, and any warnings.
+    - Error handling:
+      - Captures and records parsing exceptions, I/O errors, and openpyxl read issues. If the primary readback fails, the service falls back to in-memory summation from the DataFrame produced earlier.
+  - `get_latest_file_info()`
+    - Scans `MEDIA_ROOT/cobranzas/` for xlsx/xls files, sorts by modification time, and returns the latest file metadata (filename, path, modified timestamp).
+  - `get_totals_from_file(path)`
+    - Reads the saved Excel with `openpyxl.load_workbook(..., data_only=True)` and/or `pandas.read_excel(...)` with `engine='openpyxl'`.
+    - Detects candidate columns for USD and VES amounts using normalized header tokens (case-insensitive substring matching with a tokens list like ['monto', 'usd', 'dolar', 'equivalente', 'ves']).
+    - For each candidate cell, calls `parse_numeric_value(cell_value)` to coerce to float if possible; otherwise logs and skips.
+    - Sums all USD and USD-equivalent columns to produce `collected_total`.
+    - Optionally computes `billed_total` using billing tokens; however dashboard uses 0.0 currently.
+
+3) Utility layer (`utils.py`)
+- `extract_cobranzas_sheet(file_or_buffer)`
+  - Uses a two-pass strategy: a quick pandas scan (header=None) to find likely header rows by looking for tokens like 'cliente' plus a money token; then uses openpyxl `load_workbook(..., data_only=True)` to create a reliable table of evaluated cell values.
+  - After choosing header row, constructs a pandas DataFrame from subsequent rows, strips whitespace from headers, deduplicates headers by appending suffixes, and returns a cleaned DataFrame.
+  - Special handling for merged cells: openpyxl returns the merged value on the first cell and None elsewhere — the extractor copies values to fill merged regions when needed.
+
+4) Numeric parsing (`parse_numeric_value`) and heuristics (in `services.py` or utils)
+- Normal handling:
+  - If the value is already an int/float: return as float.
+  - If the value is a string: strip whitespace, remove currency symbols `[$USsBs.,]` and common words, then detect separators.
+  - Heuristic to detect format:
+    - If both '.' and ',' appear: if last separator is ',' then assume European style (thousands '.' and decimal ',') and convert accordingly; otherwise treat as US style.
+    - If only ',' appears and digits after comma are 2 or fewer: assume decimal separator and replace ',' with '.'; else assume thousands separator and remove commas.
+  - Final step uses a safe float cast with fallback regex to extract numeric substring and parse.
+  - Returns `None` for empty/unparseable values and logs a warning (not fatal).
+
+5) Logging and diagnostics
+- The service logs parsing warnings and stored file paths. The `scripts/` helpers (e.g., `check_media_totals.py`) call service functions and print out the warnings and final totals, assisting in debugging problematic files.
+
+Frontend: detailed responsibilities and components
+
+1) Upload UI (Upload page template `upload.html`)
+- The file input for Cobranzas is `#cobranzas_file` with an associated label describing the sheet name expected. The upload button triggers `uploadCobranzas(event)`.
+- `uploadCobranzas()` (JS; located in `upload.html` near the form scripts):
+  - Prevents default form submit if running via AJAX.
+  - Validates that a file is selected and optionally checks extension and size.
+  - Builds a `FormData()` object and appends the chosen file under `cobranzas_file`.
+  - Calls `fetch('/cobranzas/upload/', { method: 'POST', body: formData })`.
+  - On success, it triggers `setTimeout(getCobranzasStatus, 1000)` to poll for file processing status. It also updates the UI with the returned totals or messages.
+
+2) Status polling and UI updates
+- `getCobranzasStatus()` performs `fetch('/cobranzas/status/')` and expects JSON with `file_info` and `collected_total`.
+- The client updates the Upload page status area with the last processed filename, modified date, and totals. This helps users verify the upload produced the expected result without page reloads.
+
+3) Preview behavior (Preview opens in a new tab)
+- The dashboard exposes a small preview card that points to a preview URL (registered as `cobranzas:preview`). The preview page is `cobranzas_preview.html` and is intended to be a lightweight read-only view of the latest processed file and totals.
+- The preview page uses CSS scoped via `{% block extra_css %}` so it can render correctly when opened in a new tab while the main dashboard (with the fixed sidebar) is still present in the primary tab. The preview reads data server-side via the dashboard view's usage of `CobranzasService.get_latest_file_info()`.
+
+4) Clear/Delete behavior
+- The clear action sends a POST to `/cobranzas/clear/` with CSRF token. The server deletes files from the `MEDIA_ROOT/cobranzas/` path and returns a JSON confirmation. The client updates the status area and disables preview buttons when no file exists.
+
+5) UX/Edge cases handled in front end
+- The upload script shows friendly error messages for incorrect file types and displays a short help note instructing users to ensure the sheet name "Cobranzas + Ant Semana Actual" exists.
+- Because uploads can contain files with odd formatting, the client encourages users to wait and poll the status; the server includes warnings in the JSON response if parsing had to skip unparseable rows.
+
+Interaction examples (request/response JSON shapes)
+- Upload request (multipart/form-data): field `cobranzas_file` = file
+- Upload response (success):
+  {
+    "success": true,
+    "message": "Processed successfully",
+    "output_path": "media/cobranzas/Cobranzas_Latest.xlsx",
+    "collected_total": 540184.38,
+    "billed_total": 61915219.82,
+    "rows_processed": 428
+  }
+- Status response:
+  {
+    "has_file": true,
+    "file_info": { "filename": "Cobranzas_Latest.xlsx", "modified": "2025-07-11T14:02:00" },
+    "collected_total": 540184.38,
+    "billed_total": 61915219.82
+  }
+
+Developer notes, testing, and maintenance
+- Unit tests:
+  - Build unit tests for the extractor and the numeric parsing heuristics. Cover CSV/Excel files with preamble rows, merged headers, and European vs US number formats.
+  - Test fallback behavior when `openpyxl` returns None for formula-only cells.
+- Integration testing:
+  - A smoke test that posts the sample file via the upload endpoint and then calls the status endpoint asserting the returned totals match expected values.
+  - Test dashboard rendering of the Macro card to verify the card displays the `collected_total` and sets billed to `0.00`.
+- Monitoring & alerts:
+  - Consider logging parsing warnings to a persistent log file or to a monitoring system when parse failure rates exceed a threshold.
+
+Security considerations
+- Ensure the upload endpoint validates file content type and uses safe temporary locations before moving files to `MEDIA_ROOT/cobranzas/`.
+- The clear endpoint must only delete files within the module's media folder; never accept arbitrary paths from the client.
+
+Appendix: quick dev commands
+- Run local server on required port:
+  python manage.py runserver 8001
+- Run Django checks:
+  python manage.py check
+- Re-run processing directly for debugging:
+  python scripts/test_cobranzas_process.py
+
+
+Processing notes — what worked, challenges, and bugs encountered
+-----------------------------------------------------------------
+- What worked
+  - Robust header detection: the two-pass extractor (quick pandas scan for candidate header rows followed by openpyxl read with data_only=True) reliably locates the real header row in the majority of weekly reports despite preamble rows and merged cells.
+  - Numeric parsing & normalization: the heuristic `parse_numeric_value` handled mixed locales and currency symbols in real-world data (US-style and European-style separators, Bs./$ prefixes), which dramatically reduced NaNs from pandas coercion and made read-back validation (get_totals_from_file) trustworthy.
+  - Deterministic processed output: saving a normalized `Cobranzas_Latest.xlsx` with canonical column names enabled stable downstream reads (dashboard, preview) and simplified debugging — the read-back totals matched the in-memory computed totals after fixes.
+  - Aggregation correctness: explicitly summing the invoice USD column plus all USD-equivalent VES columns produced totals consistent with the user's expectations (sample validated values such as 540,184.38 matched the spreadsheet re-reads).
+  - Exchange-rate fallbacks: integrating the historical Binance file to fill missing dates/rates and forward-filling previous valid values produced a continuous per-day rate series for charting and synthetic-rate computation.
+
+- Challenges & bugs encountered
+  - Header variability: some reports had header names or preamble rows that broke a naïve header-detection approach. Early attempts that assumed a fixed header row produced shifted columns and wrong numeric totals. Fix: implement token-substring matching (cliente + money token) and dedup headers.
+  - Formula-only cells & openpyxl data_only pitfalls: in a few source files the cells contained formulas without cached evaluated values; openpyxl returned None for those cells. This produced missing values in the DataFrame and caused earlier read-back totals to be incomplete. Fix: instruct report authors to save with values, and add an in-memory fallback that sums parsed DataFrame values when read-back fails.
+  - Mixed numeric formats: the dataset contained both '1,234.56' and '1.234,56' styles. Initial parsing using a single strategy produced many NaNs. Fix: improve `parse_numeric_value` with heuristics that detect both separators and apply the appropriate normalization.
+  - Duplicate/equivalent columns: the original reports sometimes included repeated "Monto equivalente..." columns (different exchange sources). Early aggregation code only picked the first matching column and missed others, undercounting totals. Fix: deduplicate mapped columns and sum across all candidates for USD-equivalent amounts.
+  - Column-detection bug in charting code: after wiring the preview template, the stacked daily bar initially showed zero or wrong USD bars because the service and template used slightly different column-detection heuristics (a variable-name typo and a token matching mismatch). Fix: align the service aggregation to use the explicit canonical column names saved in `Cobranzas_Latest.xlsx` ("Monto en Dólares de la Factura" and "Monto equivalente en USD de los VES Cobrados").
+  - Missing dates in series: the first attempt at building the per-day arrays used the exchange-file date range (or only dates present in the exchange file) instead of the union of all `Fecha de Cobro` dates. This made the bar chart omit some collection dates. Fix: use the set of distinct `Fecha de Cobro` values as the day axis (sorted), then left-join exchange rates and forward-fill.
+  - Off-by-one / dedupe mistakes: when deduplicating header names (append _1, _2) early logic accidentally left some canonical names with suffixes that downstream code did not expect. Fix: canonical mapping step that maps normalized tokens back to the precise canonical column names used by consumers.
+
+- Lessons & mitigations
+  - Always validate with a read-back of the saved processed file (get_totals_from_file) rather than trusting the in-memory DataFrame alone — this caught several formatting/round-tripping issues early.
+  - Keep the canonical output column names stable; prefer explicit canonical columns in downstream consumers (templates, chart code) rather than re-running fuzzy detection in multiple places.
+  - Provide helpful error messages and a short user note for upload failures that request the report author to "Save as values" when formulas are present.
+  - Add unit tests for header detection and numeric parsing to prevent regressions when new report variants appear.
+
+-- End of added processing notes --
+
+Performance, caching, and preview-speed improvements (2025-07)
+------------------------------------------------------------
+Recent work addressed slow `/cobranzas/preview/` loads caused by repeated reads of many processed Excel files. The following low-risk improvements were implemented and validated with profiling:
+
+- Persistent combined-DataFrame cache
+  - Path: MEDIA_ROOT/cobranzas/cobranzas_combined_cache.pkl (pickle of tuple: (max_mtime, pandas.DataFrame)).
+  - Purpose: avoid re-reading and reparsing all per-week processed Excel files on every preview request. The cache stores the already-normalized, concatenated DataFrame used by charting and series computations.
+  - Validation: the cache includes the maximum modification time (max_mtime) of the processed files at the time it was written. When loading the cache we compare file-system mtimes; if any processed file is newer than max_mtime the cache is treated as stale and rebuilt.
+
+- In-memory process cache
+  - In addition to the persistent pickle, the service keeps an in-memory cached DataFrame (`self._cached_df`) and `self._cached_mtime` for the running process to avoid repeated pickle loads within the same process.
+
+- Atomic writes & safe persistence
+  - Cache writes employ an atomic replace pattern: write to a temp file `cobranzas_combined_cache.pkl.tmp` then os.replace -> `cobranzas_combined_cache.pkl`. This avoids partial-file reads if the process crashes while writing.
+
+- Cache invalidation hooks
+  - `process_uploaded_file()` and `clear_processed_files()` both explicitly clear the in-memory cache and remove the persistent cache file so that subsequent requests rebuild from the current files.
+
+- Preview optimization
+  - `preview_cobranzas` view was changed to call the heavy series builder (`get_daily_collections_and_rates()` / `get_all_processed_df()`) only once and reuse the result for template variables rather than calling multiple service methods that each rebuilt or reloaded data.
+
+- Column selection and footer filtering reinforcement
+  - The cumulative-collected computation (`get_cumulative_collected_up_to`) and totals readback functions were updated to:
+    - Filter out footer/summary rows by keeping only rows where at least one of the identifier columns (`Cliente`, `Socio`, `Gerente`) is present.
+    - Prefer the "Monto equivalente..." USD-equivalent column that appears immediately to the right of a BCV/"Tipo de Cambio" column when multiple candidate equivalent columns exist; this matches the user's request and avoids accidentally summing the wrong equivalent column.
+
+- Logging and diagnostics
+  - Added informational logging when the persistent cache is loaded, when it is written, and warnings when persistent cache load fails (so debugging is easier on first-run or after upgrades).
+
+- Profiling results (representative; machine: local dev Windows laptop)
+  - Cold run (no cache present): ~40–60s to read and build the combined DataFrame from ~N weekly files (I/O-bound; actual time depends on N and file sizes).
+  - Warm run (after persistent cache write): subsequent preview loads are ~0.03–0.05s (cache load + tiny processing overhead).
+
+Design rationale and tradeoffs
+- Rationale: The time-consuming part of preview is reading multiple Excel files using pandas/openpyxl. The simplest robust improvement is to cache the already-normalized combined DataFrame and invalidate it on any file change. This provides a large UX win at low risk.
+- Tradeoffs: The pickle cache is not a database nor transactional log. It assumes files are mutated or replaced with normal OS-level timestamps; pathological cases (time skew, manual edits while a write is in progress) are guarded by atomic writes and mtime checks but could still cause transient cache staleness.
+- Alternatives considered: parquet for faster reads (requires pyarrow or fastparquet), JSON summary endpoints that write reduced aggregates at upload-time. Those remain options if you want even faster warm starts or cross-process cache sharing.
+
+Files changed (summary)
+- core_dashboard/modules/cobranzas/services.py
+  - Added: persistent in-media cache path, atomic write logic, in-memory cache, _find_preferred_equiv_col helper, footer-row filtering enforced in totals/builders, get_cumulative_collected_up_to() added, cache invalidation on upload/clear.
+- core_dashboard/modules/cobranzas/views.py
+  - Changed: preview_cobranzas() to compute series once and reuse for template context to avoid duplicate heavy calls.
+- scripts/
+  - Added diagnostics and profiling helpers used during development (inspect_cobranzas_file.py, profile_daily_series.py, cumulative_cobranzas_check.py, delete_persistent_cache.py).
+
+How to reproduce & validate
+1) Delete the persistent cache (scripts/delete_persistent_cache.py or remove `media/cobranzas/cobranzas_combined_cache.pkl`).
+2) Call the preview endpoint or run `python scripts/profile_daily_series.py` — the first run will rebuild the cache (expect the long build time), and a second run will be very fast (cache hit).
+3) Upload a new processed file via the upload endpoint — observe that the service deletes the persistent cache and the next preview call triggers a rebuild.
+
+Notes for future improvements
+- Consider emitting a small JSON summary file at upload-time containing the daily aggregates and cumulative aggregates required by the preview; that would allow preview pages to serve near-instant results without unpickling a potentially large DataFrame and without requiring pandas on the preview path.
+- Consider swapping to Parquet (pyarrow) for faster serialization/deserialization if the combined DataFrame grows very large.
+- Add cross-process file-locking if multiple worker processes might write the persistent cache concurrently.
+
+-- End of performance and caching notes --
+
+Recent bugfix: cache invalidation and return-type mismatch (2025-09-15)
+----------------------------------------------------------------
+Symptom:
+- After uploading a processed Cobranzas file the dashboard card sometimes showed $0.00 (or stale value) and required re-upload to display the correct collected total.
+
+Cause:
+- The cache-invalidation logic that was intended to clear the in-memory cache and remove the persistent pickle file was placed after an early `return` in `process_uploaded_file()`. That code path never executed, leaving stale or empty cache present. Additionally, a helper `get_collected_total_from_latest()` previously returned a `(collected, billed)` tuple in some versions; code calling it expected a single float which caused incorrect display in some call sites.
+
+Fix applied:
+- Moved/ensured cache-clear logic executes before returning the upload result. The service now clears `self._cached_df`, `self._cached_mtime` and attempts to remove `cobranzas_combined_cache.pkl` (best-effort) before returning processing success to the caller.
+- Normalized `get_collected_total_from_latest()` to return a single float (the collected total). Callers that expected the tuple should use `get_totals_from_file()` explicitly.
+
+Verification steps performed:
+1) Uploaded a sample processed file via the upload endpoint; verified `media/cobranzas/Cobranzas_Latest.xlsx` was written.
+2) Confirmed the persistent cache file (if present) was removed during upload and a rebuild occurred on the next preview request.
+3) Ran the preview and dashboard flows: the Macro card now shows the expected collected total immediately after upload (no re-upload required).
+4) Ran a quick syntax check on the modified `services.py` to ensure no syntax errors were introduced.
+
+Notes / follow-ups:
+- The cache clear is best-effort and intentionally ignores rare filesystem removal errors. If you want strict behavior, we can add an explicit error path that surfaces a warning to the upload JSON response.
+- If other parts of the codebase were relying on the old tuple-returning behavior of `get_collected_total_from_latest()`, they should be updated to call `get_totals_from_file()` instead. Currently the main dashboard code uses cumulative totals and fallbacks correctly but a few legacy callers were adjusted during the fix.
+
+-- End of bugfix note --
+

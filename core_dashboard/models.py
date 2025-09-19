@@ -73,8 +73,17 @@ class RevenueEntry(models.Model):
     dif_div = models.FloatField(blank=True, null=True)
     perdida_tipo_cambio_monitor = models.FloatField(blank=True, null=True)
     fytd_diferencial_final = models.FloatField(blank=True, null=True)
+    diferencial_mtd = models.FloatField(blank=True, null=True)
     fytd_ansr_sintetico = models.FloatField(blank=True, null=True)
     total_revenue_days_p_cp = models.FloatField(blank=True, null=True)
+
+    # Collection-related fields for Cobranzas (Collected YTD) functionality
+    fytd_ar_collected_amt = models.FloatField(default=0.0, null=True, blank=True)
+    fytd_ar_collected_tax_amt = models.FloatField(default=0.0, null=True, blank=True)
+    fytd_collect_total_amt = models.FloatField(default=0.0, null=True, blank=True)
+
+    # Billing-related fields for Facturacion (Billed YTD) functionality  
+    fytd_total_billed_amt = models.FloatField(default=0.0, null=True, blank=True)
 
     def __str__(self):
         return f"{self.date} - {self.client.name} - {self.revenue}"
@@ -92,3 +101,4 @@ class ExchangeRate(models.Model):
 
     def __str__(self):
         return f"Exchange Rates for {self.date}: Oficial={self.oficial_rate}, Paralelo={self.paralelo_rate}"
+

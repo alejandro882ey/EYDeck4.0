@@ -87,6 +87,79 @@ def _load_file(file_path, expected_columns, max_header_rows=10, sheet_name=None)
         raise ValueError(f"Unsupported file type: {file_path}. Only .csv, .xls, .xlsx, .xlsb are supported.")
 
 
+def build_merged_df(engagement_df, revenue_df, week_ending_date):
+    """
+    Build the merged dataframe used for import and dashboard cards from engagement and revenue dataframes.
+    This function centralizes the logic so it can be tested in isolation.
+
+    Returns: merged_df (pandas.DataFrame)
+    """
+    # Ensure numeric types for key financial and hours columns
+    numeric_cols = [
+        "FYTD_ChargedHours", "FYTD_DirectCostAmt", "FYTD_ANSRAmt",
+        "MTD_ChargedHours", "MTD_DirectCostAmt", "MTD_ANSRAmt", "CP_ANSRAmt",
+        "FYTD_ARCollectedAmt", "FYTD_ARCollectedTaxAmt",  # Collection columns
+        "FYTD_TotalBilledAmt"  # Billing column
+    ]
+
+    for col in numeric_cols:
+        if col in engagement_df.columns:
+            engagement_df[col] = pd.to_numeric(engagement_df[col], errors='coerce')
+
+    # Process collection/billing using existing modules (these functions operate on engagement_df)
+    try:
+        from core_dashboard.modules.collection_module import process_collection_data, process_billing_data
+        engagement_df = process_collection_data(engagement_df)
+        engagement_df = process_billing_data(engagement_df)
+    except Exception:
+        # If collection module isn't available in test environment, ignore
+        pass
+
+    # Start merged_df as a copy of engagement_df (we no longer use external dif file)
+    merged_df = engagement_df.copy()
+
+    # Prefer the exact Perdida header if present, otherwise fall back to fuzzy detection
+    exact_perda = 'Perdida Dif. Camb.'
+    if exact_perda in engagement_df.columns:
+        perda_col = exact_perda
+        merged_df['diferencial_final'] = pd.to_numeric(merged_df.get(perda_col), errors='coerce')
+    else:
+        perda_col_candidates = [c for c in engagement_df.columns if 'Perdida' in c and ('Dif' in c or 'Camb' in c or 'tipo de cambio' in c)]
+        if perda_col_candidates:
+            perda_col = perda_col_candidates[0]
+            merged_df['diferencial_final'] = pd.to_numeric(merged_df.get(perda_col), errors='coerce')
+        else:
+            merged_df['diferencial_final'] = 0.0
+
+    # Exceptional date 2025-07-11: force zeros if requested
+    try:
+        if week_ending_date == pd.to_datetime('2025-07-11').date():
+            merged_df['diferencial_final'] = 0.0
+    except Exception:
+        pass
+
+    # Keep sign convention (previous code negated the monitor column)
+    merged_df['diferencial_final'] = -pd.to_numeric(merged_df['diferencial_final'], errors='coerce').fillna(0.0)
+
+    # Ensure FYTD_ANSR_Sintetico comes from Engagement synthetic if present
+    synth_col_candidates = [col for col in engagement_df.columns if 'FYTD_ANSRAmt' in col and 'Sintet' in col]
+    if synth_col_candidates:
+        synth_col = synth_col_candidates[0]
+        merged_df['FYTD_ANSR_Sintetico'] = pd.to_numeric(merged_df.get(synth_col), errors='coerce')
+    else:
+        if 'FYTD_ANSRAmt' in merged_df.columns:
+            merged_df['FYTD_ANSR_Sintetico'] = pd.to_numeric(merged_df.get('FYTD_ANSRAmt'), errors='coerce')
+        else:
+            merged_df['FYTD_ANSR_Sintetico'] = None
+
+    # Add Periodo Fiscal placeholder if not present
+    if 'Periodo Fiscal' not in merged_df.columns:
+        from core_dashboard.utils import get_fiscal_month_year
+        merged_df['Periodo Fiscal'] = get_fiscal_month_year(week_ending_date)
+
+    return merged_df
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 5:
         print("Usage: python process_uploaded_data.py <engagement_path> <dif_path> <revenue_path> <upload_date_str>", file=sys.stderr)
@@ -105,7 +178,9 @@ if __name__ == "__main__":
             "EngagementID", "Engagement", "EngagementPartner", "EngagementManager",
             "Client", "EngagementServiceLine", "EngagementSubServiceLine",
             "FYTD_ChargedHours", "FYTD_DirectCostAmt", "FYTD_ANSRAmt",
-            "MTD_ChargedHours", "MTD_DirectCostAmt", "MTD_ANSRAmt", "CP_ANSRAmt"
+            "MTD_ChargedHours", "MTD_DirectCostAmt", "MTD_ANSRAmt", "CP_ANSRAmt",
+            "FYTD_ARCollectedAmt", "FYTD_ARCollectedTaxAmt",  # Collection columns
+            "FYTD_TotalBilledAmt"  # Billing column
         ]
         dif_expected_cols = [
             "Socio", "Gerente", "Perdida al tipo de cambio Monitor",
@@ -131,108 +206,178 @@ if __name__ == "__main__":
         # Ensure numeric types for key financial and hours columns
         numeric_cols = [
             "FYTD_ChargedHours", "FYTD_DirectCostAmt", "FYTD_ANSRAmt",
-            "MTD_ChargedHours", "MTD_DirectCostAmt", "MTD_ANSRAmt", "CP_ANSRAmt"
+            "MTD_ChargedHours", "MTD_DirectCostAmt", "MTD_ANSRAmt", "CP_ANSRAmt",
+            "FYTD_ARCollectedAmt", "FYTD_ARCollectedTaxAmt",  # Collection columns
+            "FYTD_TotalBilledAmt"  # Billing column
         ]
 
         for col in numeric_cols:
             engagement_df[col] = pd.to_numeric(engagement_df[col], errors='coerce')
 
+        # Import and use collection module to process collection and billing data
+        from core_dashboard.modules.collection_module import process_collection_data, process_billing_data
+        engagement_df = process_collection_data(engagement_df)
+        engagement_df = process_billing_data(engagement_df)
 
-        # Select relevant columns
-        # The _load_file function already ensures these columns are present.
-        dif_df = dif_df[dif_expected_cols]
 
-        # Convert date column
-        dif_df["Fecha de Cobro"] = pd.to_datetime(dif_df["Fecha de Cobro"], errors='coerce')
+        # We no longer use the external DIF/Acumulado Diferencia file for diferencial values.
+        # Instead, the Engagement List contains the required 'Perdida Dif. Camb.' column
+        # which should feed all cards and charts that previously used the Monitor column.
+        # If the engagement file lacks this column (e.g., the 2025-07-11 upload),
+        # set the diferencial to 0 for those rows as a provisional behavior.
 
-        # Rename for merge
-        dif_df.rename(columns={
-            "Engagement": "EngagementID",
-            "Socio": "EngagementPartner",
-            "Gerente": "EngagementManager"
-        }, inplace=True)
+        # Merge keys are just the Engagement-level identifiers - we merge engagement_df with itself
+        # to preserve structure (no external dif_df). Use a simple copy.
+        merged_df = engagement_df.copy()
 
-        # Merge keys
-        merge_keys = ["EngagementID", "EngagementPartner", "EngagementManager"]
-
-        # Group and sum 'Perdida al tipo de cambio Monitor'
-        grouped_sum = dif_df.groupby(merge_keys, as_index=False)["Perdida al tipo de cambio Monitor"].sum()
-
-        # Preserve other columns and remove duplicates
-        preserved_data = dif_df.drop(columns=["Perdida al tipo de cambio Monitor"]).drop_duplicates(subset=merge_keys)
-
-        # Merge grouped sum back into the preserved data
-        dif_df= pd.merge(preserved_data, grouped_sum, on=merge_keys, how="left")
-
-        # Convert 'Perdida al tipo de cambio Monitor' to numeric
-        dif_df["Perdida al tipo de cambio Monitor"] = pd.to_numeric(
-            dif_df["Perdida al tipo de cambio Monitor"], errors='coerce'
-        )
-
-        # Ensure Dif_Div column exists
-        if "Dif_Div" not in dif_df.columns:
-            dif_df["Dif_Div"] = None
-
-        # Define EngagementID and EngagementPartner-based percentage rules
-        engagement_partner_pct = {
-            "E-68504587": 0.5,
-            "E-68827483": 0.5,
-            "E-68826677": {
-                "Hector Azocar": 0.7,
-                "Eduardo Sabater": 0.3
-            },
-            "E-68820284": {
-                "Hector Azocar": 0.7,
-                "Eduardo Sabater": 0.3
-            }
-        }
-
-        # Apply conditional percentages based on EngagementID and EngagementPartner
-        for idx, row in dif_df.iterrows():
-            eid = row.get("EngagementID")
-            partner = row.get("EngagementPartner")
-
-            if eid in engagement_partner_pct:
-                pct_info = engagement_partner_pct[eid]
-                if isinstance(pct_info, dict):
-                    if partner in pct_info:
-                        dif_df.at[idx, "Dif_Div"] = pct_info[partner]
-                else:
-                    dif_df.at[idx, "Dif_Div"] = pct_info
-        
-        # Merge with engagement_df
-        merged_df = pd.merge(engagement_df, dif_df, on=merge_keys, how="left")
-
-        # Use the correct column name after merge
-        merged_df["diferencial_final"] = merged_df["Perdida al tipo de cambio Monitor"]
-
-        # Apply Dif_Div logic only if the column exists
-        if 'Dif_Div' in merged_df.columns:
-            print("Found 'Dif_Div' column, applying related logic.", file=sys.stderr)
-            condition = merged_df["Dif_Div"].notna() & (merged_df["Duplicate EngagementID"] == 1)
-
-            for eid in merged_df.loc[condition, "EngagementID"].unique():
-                group = merged_df[merged_df["EngagementID"] == eid]
-                with_pct = group[group["Dif_Div"].notna()]
-                without_pct = group[group["Dif_Div"].isna()]
-                if not with_pct.empty and not without_pct.empty:
-                    pct = with_pct["Dif_Div"].values[0]
-                    original = with_pct["Perdida al tipo de cambio Monitor"].values[0]
-                    transformed = original * pct
-                    remaining = original - transformed
-                    merged_df.loc[with_pct.index, "diferencial_final"] = transformed
-                    merged_df.loc[without_pct.index, "diferencial_final"] = remaining
+        # Detect Perdida column in engagement_df (look for 'Perdida Dif. Camb.' or similar)
+        perda_col_candidates = [c for c in engagement_df.columns if 'Perdida' in c and ('Dif' in c or 'Camb' in c or 'tipo de cambio' in c)]
+        if perda_col_candidates:
+            perda_col = perda_col_candidates[0]
+            print(f"Using engagement Perdida column: {perda_col}", file=sys.stderr)
+            merged_df['diferencial_final'] = pd.to_numeric(merged_df.get(perda_col), errors='coerce')
         else:
-            print("Warning: 'Dif_Div' column not found. Skipping related logic.", file=sys.stderr)
+            print("Engagement file does not contain a 'Perdida Dif. Camb.'-like column. Setting diferencial_final to 0.", file=sys.stderr)
+            merged_df['diferencial_final'] = 0.0
+
+        # For the known exceptional date 2025-07-11 the Engagement List lacks the Perdida column.
+        # Enforce zeros for that date as requested.
+        try:
+            if week_ending_date == pd.to_datetime('2025-07-11').date():
+                merged_df['diferencial_final'] = 0.0
+        except Exception:
+            pass
+
+        # Negate sign to keep previous convention (previous code negated monitor column)
+        merged_df['diferencial_final'] = -pd.to_numeric(merged_df['diferencial_final'], errors='coerce').fillna(0.0)
 
         # Ensure numeric types
         merged_df["FYTD_ANSRAmt"] = pd.to_numeric(merged_df["FYTD_ANSRAmt"], errors='coerce')
         merged_df["diferencial_final"] = pd.to_numeric(merged_df["diferencial_final"], errors='coerce')
         merged_df["diferencial_final"] = -merged_df["diferencial_final"]
 
+        # Get the fiscal month and year for this upload
+        from core_dashboard.utils import get_fiscal_month_year
+        fiscal_period = get_fiscal_month_year(week_ending_date)
+        fiscal_month_name = fiscal_period.split(' ')[0]
+        fiscal_year = int(fiscal_period.split(' ')[1])
+
+        # Add periodo_fiscal column
+        merged_df["Periodo Fiscal"] = fiscal_period
+
+        # Check if this is July (first month of fiscal year)
+        is_first_fiscal_month = fiscal_month_name == 'Julio'
+
+        # Calculate diferencial_mtd
+        # For July (first month), just use the diferencial_final values directly
+        if is_first_fiscal_month:
+            print("Processing first fiscal month (July) - using diferencial_final as MTD", file=sys.stderr)
+            merged_df["diferencial_mtd"] = merged_df["diferencial_final"]
+            print(f"First month MTD sum: {merged_df['diferencial_mtd'].sum()}", file=sys.stderr)
+        else:
+            from django.db.models import Max
+            from core_dashboard.models import RevenueEntry
+
+            # Find the last report from the previous fiscal month
+            # Get current fiscal period
+            current_fiscal_period = get_fiscal_month_year(week_ending_date)
+            
+            # Get all unique dates and find the last one from previous fiscal month
+            all_dates = RevenueEntry.objects.values_list('date', flat=True).distinct().order_by('date')
+            
+            last_report_prev_fiscal_month = None
+            for report_date in all_dates:
+                if report_date >= week_ending_date:
+                    break
+                report_fiscal_period = get_fiscal_month_year(report_date)
+                if report_fiscal_period != current_fiscal_period:
+                    last_report_prev_fiscal_month = report_date
+
+            print(f"Current fiscal period: {current_fiscal_period}", file=sys.stderr)
+            print(f"Last report date from previous fiscal month: {last_report_prev_fiscal_month}", file=sys.stderr)
+
+            if last_report_prev_fiscal_month:
+                print("Found previous fiscal month data", file=sys.stderr)
+                # Get all entries from last report of previous fiscal month
+                last_month_entries = RevenueEntry.objects.filter(
+                    date=last_report_prev_fiscal_month
+                ).values('engagement_id', 'fytd_diferencial_final')
+                
+                # Convert to dictionary for faster lookups
+                last_month_diff_by_eng = {
+                    entry['engagement_id']: entry['fytd_diferencial_final'] 
+                    for entry in last_month_entries
+                }
+                
+                # Calculate MTD for each row
+                def calc_mtd(row):
+                    eng_id = row['EngagementID']
+                    curr_diff = row['diferencial_final'] or 0
+                    prev_diff = last_month_diff_by_eng.get(eng_id, 0) or 0
+                    mtd_value = curr_diff - prev_diff
+                    return mtd_value
+
+                # Apply the calculation and store results
+                merged_df["diferencial_mtd"] = merged_df.apply(calc_mtd, axis=1)
+                print(f"Subsequent fiscal month MTD sum: {merged_df['diferencial_mtd'].sum()}", file=sys.stderr)
+            else:
+                print("No previous fiscal month data found - using diferencial_final as MTD", file=sys.stderr)
+                merged_df["diferencial_mtd"] = merged_df["diferencial_final"]
+                print(f"MTD sum (no prev fiscal data): {merged_df['diferencial_mtd'].sum()}", file=sys.stderr)
+        
+        # Print summary for verification
+        print(f"Final diferencial_mtd sum: {merged_df['diferencial_mtd'].sum()}", file=sys.stderr)
+        print(f"Final diferencial_final sum: {merged_df['diferencial_final'].sum()}", file=sys.stderr)
+
+        # Validation step for first fiscal month
+        if is_first_fiscal_month:
+            print("Validating first month: diferencial_mtd should equal diferencial_final", file=sys.stderr)
+            # For first month, ensure diferencial_mtd matches diferencial_final
+            # Handle null values properly
+            for idx in merged_df.index:
+                final_val = merged_df.at[idx, 'diferencial_final']
+                mtd_val = merged_df.at[idx, 'diferencial_mtd']
+                
+                if pd.isna(final_val) and not pd.isna(mtd_val):
+                    # If no final value but has MTD, set MTD to NaN
+                    merged_df.at[idx, 'diferencial_mtd'] = None
+                elif not pd.isna(final_val) and pd.isna(mtd_val):
+                    # If has final value but no MTD, set MTD to final
+                    merged_df.at[idx, 'diferencial_mtd'] = final_val
+                elif not pd.isna(final_val) and not pd.isna(mtd_val) and final_val != mtd_val:
+                    # If both exist but don't match, set MTD to final
+                    merged_df.at[idx, 'diferencial_mtd'] = final_val
+            
+            # Verify after correction
+            corrected_mtd_sum = merged_df['diferencial_mtd'].sum()
+            corrected_final_sum = merged_df['diferencial_final'].sum()
+            print(f"After validation - MTD sum: {corrected_mtd_sum}, Final sum: {corrected_final_sum}", file=sys.stderr)
+
         # Recalculate FYTD_ANSR_Sintetico
-        # Replace NaN with 0 before subtraction
-        merged_df["FYTD_ANSR_Sintetico"] = merged_df["FYTD_ANSRAmt"] - merged_df["diferencial_final"].fillna(0)
+        # Note: New source mapping — FYTD_ANSR_Sintetico should be derived from the Engagement file.
+        # The Engagement file provides 'FYTD_ANSRAmt (Sintético)' in most uploads. If that column
+        # is missing (e.g., historic upload on 2025-07-11), fall back to 'FYTD_ANSRAmt'.
+        synth_col_candidates = [col for col in engagement_df.columns if 'FYTD_ANSRAmt' in col and 'Sintet' in col]
+        if synth_col_candidates:
+            synth_col = synth_col_candidates[0]
+            print(f"Using engagement synthetic ANSR column: {synth_col}", file=sys.stderr)
+            # align into merged_df
+            merged_df['FYTD_ANSR_Sintetico'] = merged_df[synth_col]
+        else:
+            # fallback to FYTD_ANSRAmt from engagement_df
+            if 'FYTD_ANSRAmt' in merged_df.columns:
+                merged_df['FYTD_ANSR_Sintetico'] = merged_df['FYTD_ANSRAmt']
+            else:
+                # As a last resort, set to NaN
+                merged_df['FYTD_ANSR_Sintetico'] = None
+
+        # If the engagement file for a specific upload date (provisional case 2025-07-11)
+        # lacks the synthetic column but provides 'FYTD_ANSRAmt', keep that as provisional value.
+        # Ensure numeric types and subtract diferencial_final where appropriate when needed
+        try:
+            merged_df['FYTD_ANSR_Sintetico'] = pd.to_numeric(merged_df['FYTD_ANSR_Sintetico'], errors='coerce')
+        except Exception:
+            pass
 
         # Find the column that contains 'Employee Country/Region'
         country_col = next((col for col in revenue_df.columns if "Employee Country/Region" in col), None)
@@ -310,19 +455,11 @@ if __name__ == "__main__":
             merged_df.drop(columns=cols_to_drop, inplace=True)
         print(f"DEBUG: merged_df columns after final index-based deletion: {merged_df.columns.tolist()}", file=sys.stderr)
 
-        # Determine output directory from engagement_path
-        output_dir = os.path.dirname(engagement_path)
-        output_filename = f"Final_Database_{week_ending_date.strftime('%Y-%m-%d')}.csv"
-        output_path = os.path.join(output_dir, output_filename)
+        # NOTE: The Final_Database CSV is no longer produced. The dashboard will read
+        # values directly from the three input files (Engagement List, Dif file, Revenue Days).
+        print("Skipping writing Final_Database CSV (legacy behavior).", file=sys.stderr)
 
-        try:
-            merged_df.to_csv(output_path, index=False)
-            print(f"Successfully processed and saved to {output_path}", file=sys.stderr)
-        except Exception as e:
-            print(f"Error saving Final_Database.csv: {e}", file=sys.stderr)
-            sys.exit(1) # Exit with error code if saving fails
-
-        # --- Create and save partner revenue days mapping ---
+    # --- Create and save partner revenue days mapping ---
         print("Creating partner revenue days mapping...", file=sys.stderr)
         revenue_days_col_index = 30 # Assuming column 31 is 0-indexed 30
         if len(merged_df.columns) > revenue_days_col_index:
@@ -336,7 +473,7 @@ if __name__ == "__main__":
                 if partner and pd.notna(revenue_days):
                     partner_revenue_days[partner] = revenue_days
             
-            media_root = os.path.dirname(os.path.dirname(output_dir))
+                media_root = os.path.dirname(os.path.dirname(os.path.dirname(engagement_path))) if os.path.dirname(engagement_path) else os.path.dirname(os.path.dirname(engagement_path))
             json_output_path = os.path.join(media_root, 'revenue_days.json')
 
             try:
@@ -410,8 +547,17 @@ if __name__ == "__main__":
                         dif_div=None if pd.isna(row.get('Dif_Div')) else row.get('Dif_Div', 0.0),
                         perdida_tipo_cambio_monitor=None if pd.isna(row.get('Perdida al tipo de cambio Monitor')) else row.get('Perdida al tipo de cambio Monitor', 0.0),
                         fytd_diferencial_final=None if pd.isna(row.get('diferencial_final')) else row.get('diferencial_final', 0.0),
+                        diferencial_mtd=None if pd.isna(row.get('diferencial_mtd')) else row.get('diferencial_mtd', 0.0),
                         fytd_ansr_sintetico=None if pd.isna(row.get('FYTD_ANSR_Sintetico')) else row.get('FYTD_ANSR_Sintetico', 0.0),
                         total_revenue_days_p_cp=None if pd.isna(row.get('Total Revenue Days P CP')) else row.get('Total Revenue Days P CP', 0.0),
+                        # Collection-related fields (DECOUPLED: these are now provided by the Cobranzas module)
+                        fytd_ar_collected_amt=None if pd.isna(row.get('FYTD_ARCollectedAmt')) else row.get('FYTD_ARCollectedAmt', 0.0),
+                        fytd_ar_collected_tax_amt=None if pd.isna(row.get('FYTD_ARCollectedTaxAmt')) else row.get('FYTD_ARCollectedTaxAmt', 0.0),
+                        # fytd_collect_total_amt and fytd_total_billed_amt are deprecated for direct population
+                        # and will be provided by the Cobranzas module. Set to None here to avoid legacy ties.
+                        fytd_collect_total_amt=None,
+                        # Billing-related fields
+                        fytd_total_billed_amt=None,
                     )
             print("Data import into Django models completed successfully.", file=sys.stderr)
         except Exception as e:
